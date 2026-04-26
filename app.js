@@ -10,6 +10,7 @@ let refreshInFlight = false;
 
 const DASHBOARD_API_URL = 'https://bingx-dashboard-api.nguyenvanvinh030625.workers.dev/dashboard';
 const LOCAL_FALLBACK_URL = 'public_dashboard.json';
+const DISPLAY_BRAND_NAME = '@damfuturenhucon';
 
 const coinIconMap = {
   BTC: '₿', ETH: '◆', SOL: '≋', BNB: '◇', XRP: '✕', DOGE: 'Ð', ADA: '●', AVAX: '▲', MATIC: '⬡', LINK: '⬢'
@@ -136,6 +137,8 @@ function kpiCard(icon, label, value, sub, negative = false, metricKeys = []) {
 
 function renderHeader() {
   const bot = dashboardData.bot || {};
+  document.title = DISPLAY_BRAND_NAME;
+  document.querySelector('h1').textContent = DISPLAY_BRAND_NAME;
   document.getElementById('botStatusText').textContent = safe(bot.status_text);
   const updatedAt = dashboardData.cloudflare_published_at || bot.updated_at;
   document.getElementById('updatedAt').innerHTML = `<span class="live-badge">Live</span> ${freshnessText(updatedAt)}`;
