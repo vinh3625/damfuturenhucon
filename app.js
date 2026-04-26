@@ -4,6 +4,9 @@ let selectedSignalIndex = 0;
 let activeLogFilter = 'all';
 let eventsBound = false;
 
+const DASHBOARD_API_URL = 'https://bingx-dashboard-api.nguyenvanvinh030625.workers.dev/dashboard';
+const LOCAL_FALLBACK_URL = 'public_dashboard.json';
+
 const coinIconMap = {
   BTC: '₿', ETH: '◆', SOL: '≋', BNB: '◇', XRP: '✕', DOGE: 'Ð', ADA: '●', AVAX: '▲', MATIC: '⬡', LINK: '⬢'
 };
@@ -35,10 +38,22 @@ function ensureFavicon() {
   document.head.appendChild(icon);
 }
 
+async function loadDashboardData() {
+  try {
+    const res = await fetch(DASHBOARD_API_URL, { cache: 'no-store' });
+    if (!res.ok) throw new Error(`Worker fetch failed: ${res.status}`);
+    return await res.json();
+  } catch (err) {
+    console.warn('[dashboard] Worker fetch failed, using local fallback', err);
+    const fallback = await fetch(LOCAL_FALLBACK_URL, { cache: 'no-store' });
+    if (!fallback.ok) throw new Error(`Local fallback failed: ${fallback.status}`);
+    return await fallback.json();
+  }
+}
+
 async function loadData() {
   try {
-    const res = await fetch('public_dashboard.json', { cache: 'no-store' });
-    dashboardData = await res.json();
+    dashboardData = await loadDashboardData();
   } catch (error) {
     document.body.insertAdjacentHTML('afterbegin', '<div style="padding:12px;background:#341;color:#fff;text-align:center">Không đọc được public_dashboard.json. Hãy mở qua local server hoặc hosting tĩnh.</div>');
     throw error;
@@ -373,3 +388,11 @@ function renderAll() {
 
 ensureFavicon();
 loadData();
+setInterval(async () => {
+  try {
+    dashboardData = await loadDashboardData();
+    renderAll();
+  } catch (error) {
+    console.warn('[dashboard] Auto refresh failed', error);
+  }
+}, 30000);
