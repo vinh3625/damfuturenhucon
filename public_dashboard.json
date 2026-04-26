@@ -1,0 +1,340 @@
+{
+  "bot": {
+    "name": "BINGX SIGNAL BOT",
+    "status": "online",
+    "status_text": "ĐANG HOẠT ĐỘNG",
+    "updated_at": "2026-04-26T14:07:02+00:00",
+    "mode": "public_dashboard"
+  },
+  "summary": {
+    "total_signals": 3,
+    "win_rate": 0.0,
+    "total_r": 0,
+    "active_trades": 2,
+    "max_drawdown_r": 0.0,
+    "today_signals": 2,
+    "active_signals": 2,
+    "pending_signals": 0,
+    "closed_signals": 0
+  },
+  "latest_signal": {
+    "symbol": "BTCUSDT",
+    "direction": "LONG",
+    "system": "SWING_M15",
+    "timeframe": "M15",
+    "entry": 77946.6,
+    "sl": 77843.990598,
+    "tp1": 78049.209402,
+    "tp2": 78141.557864,
+    "status": "Chờ xác nhận",
+    "confidence": 86,
+    "created_at": "26/04/2026 20:45",
+    "created_at_iso": "2026-04-26T20:45:02+07:00",
+    "date": "26/04/2026",
+    "time": "20:45",
+    "display_time": "26/04/2026 20:45",
+    "note": "Tín hiệu đang được theo dõi."
+  },
+  "signals": [
+    {
+      "symbol": "BTCUSDT",
+      "direction": "LONG",
+      "system": "SWING_M15",
+      "timeframe": "M15",
+      "entry": 77946.6,
+      "sl": 77843.990598,
+      "tp1": 78049.209402,
+      "tp2": 78141.557864,
+      "status": "Chờ xác nhận",
+      "confidence": 86,
+      "created_at": "26/04/2026 20:45",
+      "created_at_iso": "2026-04-26T20:45:02+07:00",
+      "date": "26/04/2026",
+      "time": "20:45",
+      "display_time": "26/04/2026 20:45",
+      "note": "Tín hiệu đang được theo dõi."
+    },
+    {
+      "symbol": "ETHUSDT",
+      "direction": "LONG",
+      "system": "MANUAL_ENTRY",
+      "timeframe": "M5",
+      "entry": 2313.28,
+      "sl": 2304.02,
+      "tp1": 2322.53,
+      "tp2": 2331.78,
+      "status": "Đang chạy",
+      "confidence": 0,
+      "created_at": "24/04/2026 17:46",
+      "created_at_iso": "2026-04-24T17:46:25+07:00",
+      "date": "24/04/2026",
+      "time": "17:46",
+      "display_time": "24/04/2026 17:46",
+      "note": "Tín hiệu đang được theo dõi."
+    },
+    {
+      "symbol": "BTCUSDT",
+      "direction": "LONG",
+      "system": "SWING_M15",
+      "timeframe": "-",
+      "entry": null,
+      "sl": null,
+      "tp1": null,
+      "tp2": null,
+      "status": "Chờ xác nhận",
+      "confidence": 0,
+      "created_at": "26/04/2026 14:07",
+      "created_at_iso": "2026-04-26T14:07:02+00:00",
+      "date": "26/04/2026",
+      "time": "14:07",
+      "display_time": "26/04/2026 14:07",
+      "note": "Tín hiệu đang được theo dõi."
+    }
+  ],
+  "active_trades": [
+    {
+      "symbol": "BTCUSDT",
+      "direction": "LONG",
+      "entry": 77946.6,
+      "tp1": 78049.209402,
+      "tp2": 78141.557864,
+      "sl": 77843.990598,
+      "status": "Đang chạy"
+    },
+    {
+      "symbol": "ETHUSDT",
+      "direction": "LONG",
+      "entry": 2313.28,
+      "tp1": 2322.53,
+      "tp2": 2331.78,
+      "sl": 2304.02,
+      "status": "Đang chạy"
+    }
+  ],
+  "live_panel": [
+    {
+      "symbol": "BTCUSDT",
+      "status": "Đang chạy",
+      "note": "LONG | Entry 77946.6"
+    },
+    {
+      "symbol": "ETHUSDT",
+      "status": "Đang chạy",
+      "note": "LONG | Entry 2313.28"
+    }
+  ],
+  "recent_results": [],
+  "activity_logs": [
+    {
+      "time": "20:45",
+      "type": "SIGNAL",
+      "message": "BTCUSDT LONG - Chờ xác nhận"
+    },
+    {
+      "time": "17:46",
+      "type": "SIGNAL",
+      "message": "ETHUSDT LONG - Đang chạy"
+    },
+    {
+      "time": "14:07",
+      "type": "SIGNAL",
+      "message": "BTCUSDT LONG - Chờ xác nhận"
+    }
+  ],
+  "system": {
+    "risk_lock": false,
+    "data_status": "Bình thường",
+    "last_error": "",
+    "last_m1_scan": "",
+    "last_m5_scan": "",
+    "active_positions": 2
+  },
+  "performance_30d": [
+    {
+      "date": "2026-03-28",
+      "r": 0.0
+    },
+    {
+      "date": "2026-03-29",
+      "r": 0.0
+    },
+    {
+      "date": "2026-03-30",
+      "r": 0.0
+    },
+    {
+      "date": "2026-03-31",
+      "r": 0.0
+    },
+    {
+      "date": "2026-04-01",
+      "r": 0.0
+    },
+    {
+      "date": "2026-04-02",
+      "r": 0.0
+    },
+    {
+      "date": "2026-04-03",
+      "r": 0.0
+    },
+    {
+      "date": "2026-04-04",
+      "r": 0.0
+    },
+    {
+      "date": "2026-04-05",
+      "r": 0.0
+    },
+    {
+      "date": "2026-04-06",
+      "r": 0.0
+    },
+    {
+      "date": "2026-04-07",
+      "r": 0.0
+    },
+    {
+      "date": "2026-04-08",
+      "r": 0.0
+    },
+    {
+      "date": "2026-04-09",
+      "r": 0.0
+    },
+    {
+      "date": "2026-04-10",
+      "r": 0.0
+    },
+    {
+      "date": "2026-04-11",
+      "r": 0.0
+    },
+    {
+      "date": "2026-04-12",
+      "r": 0.0
+    },
+    {
+      "date": "2026-04-13",
+      "r": 0.0
+    },
+    {
+      "date": "2026-04-14",
+      "r": 0.0
+    },
+    {
+      "date": "2026-04-15",
+      "r": 0.0
+    },
+    {
+      "date": "2026-04-16",
+      "r": 0.0
+    },
+    {
+      "date": "2026-04-17",
+      "r": 0.0
+    },
+    {
+      "date": "2026-04-18",
+      "r": 0.0
+    },
+    {
+      "date": "2026-04-19",
+      "r": 0.0
+    },
+    {
+      "date": "2026-04-20",
+      "r": 0.0
+    },
+    {
+      "date": "2026-04-21",
+      "r": 0.0
+    },
+    {
+      "date": "2026-04-22",
+      "r": 0.0
+    },
+    {
+      "date": "2026-04-23",
+      "r": 0.0
+    },
+    {
+      "date": "2026-04-24",
+      "r": 0.0
+    },
+    {
+      "date": "2026-04-25",
+      "r": 0.0
+    },
+    {
+      "date": "2026-04-26",
+      "r": 0.0
+    }
+  ],
+  "weekly_results": [
+    {
+      "label": "Tuần -3",
+      "range": "2026-03-30 - 2026-04-05",
+      "r": 0.0
+    },
+    {
+      "label": "Tuần -2",
+      "range": "2026-04-06 - 2026-04-12",
+      "r": 0.0
+    },
+    {
+      "label": "Tuần -1",
+      "range": "2026-04-13 - 2026-04-19",
+      "r": 0.0
+    },
+    {
+      "label": "Tuần này",
+      "range": "2026-04-20 - 2026-04-26",
+      "r": 0.0
+    }
+  ],
+  "result_distribution": [
+    {
+      "label": "TP1 HIT",
+      "count": 0,
+      "percent": 0.0
+    },
+    {
+      "label": "TP2 HIT",
+      "count": 0,
+      "percent": 0.0
+    },
+    {
+      "label": "SL",
+      "count": 0,
+      "percent": 0.0
+    },
+    {
+      "label": "Thoát sớm",
+      "count": 0,
+      "percent": 0.0
+    }
+  ],
+  "pair_performance": [
+    {
+      "symbol": "ETHUSDT",
+      "trades": 0,
+      "win_rate": 0,
+      "r": 0
+    }
+  ],
+  "daily_events": {
+    "signals_created": 1,
+    "entries_executed": 1,
+    "tp_hit": 0,
+    "sl_hit": 0
+  },
+  "risk_disclaimer": "Tín hiệu chỉ mang tính tham khảo. Crypto Futures có rủi ro cao. Không cam kết lợi nhuận.",
+  "generated_at": "2026-04-26T14:07:02+00:00",
+  "system_status": {
+    "status": "ok",
+    "signals_source": "ok",
+    "risk_locked": false,
+    "active_trades_count": 2
+  }
+}

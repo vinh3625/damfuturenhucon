@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>BINGX SIGNAL BOT</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="app">
+      <header class="app-header">
+        <div>
+          <h1>BINGX SIGNAL BOT</h1>
+          <p class="subtitle">Public dashboard · Crypto Futures signal monitoring</p>
+        </div>
+        <nav class="tabs" aria-label="Dashboard tabs">
+          <button class="tab active" data-tab="home">Trang chủ</button>
+          <button class="tab" data-tab="signals">Tín hiệu</button>
+          <button class="tab" data-tab="performance">Hiệu suất</button>
+          <button class="tab" data-tab="logs">Nhật ký</button>
+        </nav>
+        <div class="status-box">
+          <div class="status-pill"><span class="pulse"></span><span id="botStatusText">ĐANG HOẠT ĐỘNG</span></div>
+          <div class="updated">Cập nhật lần cuối: <span id="updatedAt">--</span></div>
+        </div>
+      </header>
+
+      <section id="tab-home" class="tab-panel active">
+        <div class="kpi-grid" id="homeKpis"></div>
+
+        <section class="latest-card glow-card" id="latestSignal"></section>
+
+        <div class="two-col">
+          <section class="panel">
+            <div class="panel-title">📈 Lệnh đang chạy</div>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Cặp</th><th>Hướng</th><th>Entry</th><th>TP1</th><th>TP2</th><th>SL</th><th>Trạng thái</th></tr></thead>
+                <tbody id="activeTradesBody"></tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-title">📡 Live panel</div>
+            <div id="livePanelList" class="live-list"></div>
+            <div class="system-mini" id="systemMini"></div>
+          </section>
+        </div>
+
+        <div class="two-col lower">
+          <section class="panel">
+            <div class="panel-title">🏁 Kết quả gần đây</div>
+            <div id="recentResults" class="result-list"></div>
+          </section>
+          <section class="panel">
+            <div class="panel-title">🧾 Nhật ký bot</div>
+            <div id="shortLogs" class="timeline compact"></div>
+          </section>
+        </div>
+
+        <section class="risk-banner">
+          <div class="risk-icon">⚠️</div>
+          <div>
+            <h3>Cảnh báo rủi ro</h3>
+            <p>Tín hiệu chỉ mang tính tham khảo. Crypto Futures có rủi ro cao. Không cam kết lợi nhuận.</p>
+          </div>
+        </section>
+      </section>
+
+      <section id="tab-signals" class="tab-panel">
+        <section class="panel page-head">
+          <div>
+            <div class="page-title">📶 Tín hiệu giao dịch</div>
+            <p>Danh sách tín hiệu đã được lọc sạch để hiển thị công khai.</p>
+          </div>
+          <div class="mini-kpi-row" id="signalsKpis"></div>
+        </section>
+
+        <section class="filter-bar">
+          <button class="filter active" data-filter="all">Tất cả</button>
+          <button class="filter" data-filter="Đang chạy">● Đang chạy</button>
+          <button class="filter" data-filter="Chờ xác nhận">● Chờ xác nhận</button>
+          <button class="filter" data-filter="closed">● Đã đóng</button>
+          <label>Cặp <select id="pairFilter"><option value="all">Tất cả</option></select></label>
+          <label>Khung <select id="tfFilter"><option value="all">Tất cả</option></select></label>
+          <label>Hướng <select id="dirFilter"><option value="all">Tất cả</option><option>LONG</option><option>SHORT</option></select></label>
+          <button id="resetFilters" class="refresh-btn">↻ Làm mới</button>
+        </section>
+
+        <div class="signals-layout">
+          <section class="panel table-panel">
+            <div class="table-wrap signal-table-wrap">
+              <table class="signal-table">
+                <thead>
+                  <tr><th>Cặp</th><th>Hướng</th><th>Hệ thống</th><th>Khung</th><th>Entry</th><th>SL</th><th>TP1</th><th>TP2</th><th>Trạng thái</th><th>Thời gian</th></tr>
+                </thead>
+                <tbody id="signalsBody"></tbody>
+              </table>
+            </div>
+            <div class="pagination"><span id="signalCountText">Hiển thị 0 tín hiệu</span><div><button>‹</button><button class="active">1</button><button>2</button><button>3</button><button>›</button></div></div>
+          </section>
+
+          <aside class="panel detail-panel" id="signalDetail"></aside>
+        </div>
+      </section>
+
+      <section id="tab-performance" class="tab-panel">
+        <div class="kpi-grid" id="performanceKpis"></div>
+        <div class="chart-layout">
+          <section class="panel chart-big">
+            <div class="panel-title">↗ Hiệu suất 30 ngày</div>
+            <div class="legend"><span class="dot green"></span> Tổng lợi nhuận (R) <span class="dash"></span> Vốn tham chiếu (0R)</div>
+            <div id="lineChart" class="line-chart"></div>
+          </section>
+          <section class="panel">
+            <div class="panel-title">▮ Kết quả theo tuần</div>
+            <div id="weeklyBars" class="bar-chart"></div>
+          </section>
+        </div>
+        <div class="three-col">
+          <section class="panel">
+            <div class="panel-title">◔ Phân bổ kết quả</div>
+            <div id="distribution" class="distribution"></div>
+          </section>
+          <section class="panel">
+            <div class="panel-title">▦ Hiệu suất theo cặp</div>
+            <div class="table-wrap"><table><thead><tr><th>Cặp</th><th>Số lệnh</th><th>Win rate</th><th>Tổng R</th></tr></thead><tbody id="pairPerfBody"></tbody></table></div>
+          </section>
+          <section class="panel" id="insights"></section>
+        </div>
+      </section>
+
+      <section id="tab-logs" class="tab-panel">
+        <section class="panel page-head">
+          <div>
+            <div class="page-title">📋 Nhật ký hoạt động</div>
+            <p>Audit trail công khai: chỉ hiện sự kiện đã được lọc, không hiện lỗi nhạy cảm.</p>
+          </div>
+        </section>
+        <section class="filter-bar log-filter">
+          <button class="log-pill active" data-log="all">Tất cả</button>
+          <button class="log-pill" data-log="Tín hiệu">Tín hiệu</button>
+          <button class="log-pill" data-log="Vào lệnh">Vào lệnh</button>
+          <button class="log-pill" data-log="Thoát lệnh">Thoát lệnh</button>
+          <button class="log-pill" data-log="Hệ thống">Hệ thống</button>
+          <button class="log-pill" data-log="Cảnh báo">Cảnh báo</button>
+          <input id="logSearch" placeholder="Tìm kiếm sự kiện..." />
+        </section>
+        <div class="logs-layout">
+          <section class="panel log-table-panel">
+            <div class="log-table-head"><span>Thời gian</span><span>Loại</span><span>Chi tiết sự kiện</span></div>
+            <div id="activityLogs" class="timeline log-table"></div>
+          </section>
+          <aside class="side-stack">
+            <section class="panel" id="systemSummary"></section>
+            <section class="panel" id="dailyHighlights"></section>
+            <section class="panel info-note">ℹ️ Dữ liệu nhật ký công khai chỉ nên lưu dữ liệu đã lọc. Không public exception/log kỹ thuật sâu.</section>
+          </aside>
+        </div>
+      </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
