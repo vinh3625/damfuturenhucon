@@ -3,6 +3,10 @@ let activeSignalFilter = 'all';
 let selectedSignalIndex = 0;
 let activeLogFilter = 'all';
 let eventsBound = false;
+let previousMetricSnapshot = null;
+let changedMetrics = new Set();
+let liveStateTimer = null;
+let refreshInFlight = false;
 
 const DASHBOARD_API_URL = 'https://bingx-dashboard-api.nguyenvanvinh030625.workers.dev/dashboard';
 const LOCAL_FALLBACK_URL = 'public_dashboard.json';
@@ -29,6 +33,17 @@ const fmtR = (value) => {
 };
 const clsDir = (d) => safeStatus(d) === 'LONG' ? 'long' : 'short';
 const iconFor = (symbol = '') => coinIconMap[safeStatus(symbol).replace('USDT', '')] || '◎';
+const metricChanged = (...keys) => keys.some(key => changedMetrics.has(key));
+
+const trackedMetrics = {
+  'summary.total_signals': data => safeNumber(data?.summary?.total_signals),
+  'summary.win_rate': data => safeNumber(data?.summary?.win_rate),
+  'summary.total_r': data => safeNumber(data?.summary?.total_r),
+  'summary.active_trades': data => safeNumber(data?.summary?.active_trades),
+  'latest_signal.symbol': data => safe(data?.latest_signal?.symbol, ''),
+  'latest_signal.status': data => safe(data?.latest_signal?.status, ''),
+  'active_trades.count': data => arr(data?.active_trades).length
+};
 
 function ensureFavicon() {
   if (document.querySelector('link[rel~="icon"]')) return;
@@ -51,14 +66,54 @@ async function loadDashboardData() {
   }
 }
 
-async function loadData() {
+function createMetricSnapshot(data) {
+  return Object.fromEntries(Object.entries(trackedMetrics).map(([key, read]) => [key, read(data)]));
+}
+
+function setDashboardData(nextData) {
+  const nextSnapshot = createMetricSnapshot(nextData);
+  changedMetrics = previousMetricSnapshot
+    ? new Set(Object.keys(nextSnapshot).filter(key => nextSnapshot[key] !== previousMetricSnapshot[key]))
+    : new Set();
+  previousMetricSnapshot = nextSnapshot;
+  dashboardData = nextData;
+}
+
+function markRefreshStart() {
+  document.body.classList.add('data-refreshing');
+}
+
+function markRefreshDone() {
+  document.body.classList.remove('data-refreshing');
+  document.body.classList.add('refreshed', 'live-updated');
+  clearTimeout(liveStateTimer);
+  liveStateTimer = setTimeout(() => {
+    document.body.classList.remove('refreshed', 'live-updated');
+  }, 1100);
+}
+
+async function refreshDashboard({ showError = false } = {}) {
+  if (refreshInFlight) return;
+  refreshInFlight = true;
+  markRefreshStart();
   try {
-    dashboardData = await loadDashboardData();
+    setDashboardData(await loadDashboardData());
+    renderAll();
+    markRefreshDone();
   } catch (error) {
-    document.body.insertAdjacentHTML('afterbegin', '<div style="padding:12px;background:#341;color:#fff;text-align:center">Không đọc được public_dashboard.json. Hãy mở qua local server hoặc hosting tĩnh.</div>');
-    throw error;
+    document.body.classList.remove('data-refreshing');
+    if (showError) {
+      document.body.insertAdjacentHTML('afterbegin', '<div style="padding:12px;background:#341;color:#fff;text-align:center">Không đọc được public_dashboard.json. Hãy mở qua local server hoặc hosting tĩnh.</div>');
+      throw error;
+    }
+    console.warn('[dashboard] Auto refresh failed', error);
+  } finally {
+    refreshInFlight = false;
   }
-  renderAll();
+}
+
+async function loadData() {
+  return refreshDashboard({ showError: true });
 }
 
 function sparkSvg(points = [4,8,6,12,11,17,14,22]) {
@@ -68,10 +123,13 @@ function sparkSvg(points = [4,8,6,12,11,17,14,22]) {
   return `<svg class="spark" viewBox="0 0 100 40" preserveAspectRatio="none"><path d="M ${coords.replaceAll(' ', ' L ')}" /></svg>`;
 }
 
-function kpiCard(icon, label, value, sub, negative = false) {
-  return `<article class="kpi-card">
+function kpiCard(icon, label, value, sub, negative = false, metricKeys = []) {
+  const keys = Array.isArray(metricKeys) ? metricKeys : metricKeys ? [metricKeys] : [];
+  const changed = keys.some(key => changedMetrics.has(key));
+  const metricAttr = keys.length ? ` data-metric="${keys[0]}"` : '';
+  return `<article class="kpi-card ${changed ? 'value-updated' : ''}"${metricAttr}>
     <div class="kpi-icon">${icon}</div>
-    <div><div class="kpi-label">${label}</div><div class="kpi-value ${negative ? 'num-red' : ''}">${value}</div><div class="kpi-sub">${sub}</div></div>
+    <div><div class="kpi-label">${label}</div><div class="kpi-value ${negative ? 'num-red' : ''} ${changed ? 'value-flash' : ''}">${value}</div><div class="kpi-sub">${sub}</div></div>
     ${sparkSvg(negative ? [22,20,18,19,14,12,9,8] : [4,6,5,10,8,14,12,18,16,22])}
   </article>`;
 }
@@ -79,31 +137,49 @@ function kpiCard(icon, label, value, sub, negative = false) {
 function renderHeader() {
   const bot = dashboardData.bot || {};
   document.getElementById('botStatusText').textContent = safe(bot.status_text);
-  document.getElementById('updatedAt').textContent = safe(bot.updated_at);
+  const updatedAt = dashboardData.cloudflare_published_at || bot.updated_at;
+  document.getElementById('updatedAt').innerHTML = `<span class="live-badge">Live</span> ${freshnessText(updatedAt)}`;
+}
+
+function freshnessText(value) {
+  const raw = safeStatus(value);
+  const time = Date.parse(raw);
+  if (!raw || Number.isNaN(time)) return safe(value);
+
+  const seconds = Math.max(0, Math.floor((Date.now() - time) / 1000));
+  if (seconds < 60) return `Cập nhật ${seconds} giây trước`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `Cập nhật ${minutes} phút trước`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `Cập nhật ${hours} giờ trước`;
+  return safe(value);
 }
 
 function renderHome() {
   const s = dashboardData.summary || {};
   document.getElementById('homeKpis').innerHTML = [
-    kpiCard('📡', 'Tổng tín hiệu', safeNumber(s.total_signals), '30 ngày gần nhất'),
-    kpiCard('🏆', 'Win rate', `${safeNumber(s.win_rate)}%`, '30 ngày gần nhất'),
-    kpiCard('$', 'Tổng lợi nhuận', fmtR(s.total_r), '30 ngày gần nhất'),
-    kpiCard('〽', 'Lệnh đang chạy', safeNumber(s.active_trades), 'cập nhật realtime')
+    kpiCard('📡', 'Tổng tín hiệu', safeNumber(s.total_signals), '30 ngày gần nhất', false, 'summary.total_signals'),
+    kpiCard('🏆', 'Win rate', `${safeNumber(s.win_rate)}%`, '30 ngày gần nhất', false, 'summary.win_rate'),
+    kpiCard('$', 'Tổng lợi nhuận', fmtR(s.total_r), '30 ngày gần nhất', false, 'summary.total_r'),
+    kpiCard('〽', 'Lệnh đang chạy', safeNumber(s.active_trades), 'cập nhật realtime', false, ['summary.active_trades', 'active_trades.count'])
   ].join('');
 
   const l = dashboardData.latest_signal || {};
   const latestSymbol = safe(l.symbol, 'ETHUSDT');
   const latestDirection = safe(l.direction, 'LONG');
   const latestStatus = safe(l.status, 'Chưa có tín hiệu');
+  const latestChanged = metricChanged('latest_signal.symbol', 'latest_signal.status');
+  const latestCard = document.getElementById('latestSignal');
+  latestCard.classList.toggle('value-updated', latestChanged);
   document.getElementById('latestSignal').innerHTML = `<div class="latest-inner">
     <div class="panel-title">🔥 Tín hiệu mới nhất</div>
     <div class="latest-grid">
-      <div class="signal-symbol"><span class="coin-icon">${iconFor(latestSymbol)}</span><span class="big-symbol">${latestSymbol}</span><span class="badge ${clsDir(latestDirection)}">${latestDirection}</span></div>
+      <div class="signal-symbol"><span class="coin-icon ${metricChanged('latest_signal.symbol') ? 'soft-pulse' : ''}">${iconFor(latestSymbol)}</span><span class="big-symbol ${metricChanged('latest_signal.symbol') ? 'value-flash' : ''}">${latestSymbol}</span><span class="badge ${clsDir(latestDirection)}">${latestDirection}</span></div>
       ${field('Khung', l.timeframe)}${field('Entry', l.entry)}${field('SL', l.sl, 'num-red')}${field('TP1', l.tp1, 'num-green')}${field('TP2', l.tp2, 'num-green')}
       <div class="target-mark">◎</div>
     </div>
     <div class="latest-extra">
-      ${field('Trạng thái', `<span class="badge info">${latestStatus}</span>`)}
+      ${field('Trạng thái', `<span class="badge info ${metricChanged('latest_signal.status') ? 'value-updated' : ''}">${latestStatus}</span>`)}
       ${field('Hệ thống', l.system, 'num-cyan')}
       ${field('Độ tự tin', l.confidence, 'num-green')}
       ${field('Thời gian', l.created_at)}
@@ -112,7 +188,7 @@ function renderHome() {
 
   const activeTrades = arr(dashboardData.active_trades);
   document.getElementById('activeTradesBody').innerHTML = activeTrades.length
-    ? activeTrades.map(t => tradeRow(t)).join('')
+    ? activeTrades.map(t => tradeRow(t, metricChanged('active_trades.count'))).join('')
     : '<tr><td colspan="7" class="empty-state">Chưa có lệnh đang chạy</td></tr>';
 
   document.getElementById('livePanelList').innerHTML = arr(dashboardData.live_panel).map(item => {
@@ -135,10 +211,10 @@ function field(label, value, cls = '') {
   return `<div><div class="field-label">${label}</div><div class="field-value ${cls}">${safe(value)}</div></div>`;
 }
 
-function tradeRow(t) {
+function tradeRow(t, changed = false) {
   const status = safe(t.status);
   const statusClass = safeStatus(status).includes('Chờ') ? 'wait' : 'green';
-  return `<tr><td><strong><span class="coin-icon" style="width:30px;height:30px;font-size:14px;margin-right:8px">${iconFor(t.symbol)}</span>${safe(t.symbol)}</strong></td><td class="${clsDir(t.direction)}"><strong>${safe(t.direction)}</strong></td><td>${safe(t.entry)}</td><td>${safe(t.tp1)}</td><td>${safe(t.tp2)}</td><td class="num-red">${safe(t.sl)}</td><td><span class="badge ${statusClass}">${status}</span></td></tr>`;
+  return `<tr class="${changed ? 'row-enter' : ''}"><td><strong><span class="coin-icon" style="width:30px;height:30px;font-size:14px;margin-right:8px">${iconFor(t.symbol)}</span>${safe(t.symbol)}</strong></td><td class="${clsDir(t.direction)}"><strong>${safe(t.direction)}</strong></td><td>${safe(t.entry)}</td><td>${safe(t.tp1)}</td><td>${safe(t.tp2)}</td><td class="num-red">${safe(t.sl)}</td><td><span class="badge ${statusClass}">${status}</span></td></tr>`;
 }
 
 function renderSystemMini(id) {
@@ -234,9 +310,9 @@ function detailRow(label, value, cls = '') { return `<div class="detail-row"><sp
 function renderPerformance() {
   const s = dashboardData.summary || {};
   document.getElementById('performanceKpis').innerHTML = [
-    kpiCard('🏆', 'Win rate', `${safeNumber(s.win_rate)}%`, '30 ngày gần nhất'),
-    kpiCard('$', 'Tổng lợi nhuận', fmtR(s.total_r), '30 ngày gần nhất'),
-    kpiCard('📡', 'Tổng tín hiệu', safeNumber(s.total_signals), '30 ngày gần nhất'),
+    kpiCard('🏆', 'Win rate', `${safeNumber(s.win_rate)}%`, '30 ngày gần nhất', false, 'summary.win_rate'),
+    kpiCard('$', 'Tổng lợi nhuận', fmtR(s.total_r), '30 ngày gần nhất', false, 'summary.total_r'),
+    kpiCard('📡', 'Tổng tín hiệu', safeNumber(s.total_signals), '30 ngày gần nhất', false, 'summary.total_signals'),
     kpiCard('↘', 'Drawdown tối đa', fmtR(s.max_drawdown_r), '30 ngày gần nhất', true)
   ].join('');
   renderLineChart();
@@ -352,7 +428,11 @@ function bindEvents() {
     document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
     document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
     button.classList.add('active');
-    document.getElementById(`tab-${button.dataset.tab}`)?.classList.add('active');
+    const panel = document.getElementById(`tab-${button.dataset.tab}`);
+    if (panel) {
+      panel.classList.add('active', 'tab-transitioning');
+      setTimeout(() => panel.classList.remove('tab-transitioning'), 260);
+    }
   }));
 
   document.querySelectorAll('.filter').forEach(button => button.addEventListener('click', () => {
@@ -388,11 +468,6 @@ function renderAll() {
 
 ensureFavicon();
 loadData();
-setInterval(async () => {
-  try {
-    dashboardData = await loadDashboardData();
-    renderAll();
-  } catch (error) {
-    console.warn('[dashboard] Auto refresh failed', error);
-  }
+setInterval(() => {
+  refreshDashboard();
 }, 30000);
