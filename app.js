@@ -310,11 +310,12 @@ function getFilteredSignals() {
 }
 
 function renderSignalTable() {
+  document.querySelector('.signal-table thead').innerHTML = '<tr><th>Cặp</th><th>Hướng</th><th>Khung</th><th>Entry</th><th>SL</th><th>TP1</th><th>TP2</th><th>Trạng thái</th></tr>';
   const hasPublicSignals = arr(dashboardData.signals).length > 0;
   const rows = hasPublicSignals ? getFilteredSignals() : [];
   if (selectedSignalIndex >= rows.length) selectedSignalIndex = 0;
   if (!rows.length) {
-    document.getElementById('signalsBody').innerHTML = '<tr><td colspan="10" class="empty-state">Chưa có tín hiệu public</td></tr>';
+    document.getElementById('signalsBody').innerHTML = '<tr><td colspan="8" class="empty-state">Chưa có tín hiệu public</td></tr>';
     document.getElementById('signalCountText').textContent = 'Hiển thị 0 tín hiệu';
     renderSignalDetail(signalList()[0] || {});
     return;
@@ -325,8 +326,8 @@ function renderSignalTable() {
     return `<tr class="${idx === selectedSignalIndex ? 'selected' : ''}" data-signal-index="${idx}">
       <td><strong><span class="coin-icon" style="width:30px;height:30px;font-size:14px;margin-right:8px">${iconFor(sig.symbol)}</span>${safe(sig.symbol, 'ETHUSDT')}</strong></td>
       <td class="${clsDir(sig.direction)}"><strong>${safe(sig.direction, 'LONG')}</strong></td>
-      <td class="num-cyan">${formatRiskReward(sig)}</td><td>${safe(sig.timeframe)}</td><td>${safe(sig.entry)}</td><td class="num-red">${safe(sig.sl)}</td><td class="num-green">${safe(sig.tp1)}</td><td class="num-green">${safe(sig.tp2)}</td>
-      <td><span class="badge ${statusClass(status)}">${status}</span></td><td>${safe(sig.time)}<br><small>${safe(sig.date)}</small></td>
+      <td>${safe(sig.timeframe)}</td><td>${safe(sig.entry)}</td><td class="num-red">${safe(sig.sl)}</td><td class="num-green">${safe(sig.tp1)}</td><td class="num-green">${safe(sig.tp2)}</td>
+      <td><span class="badge ${statusClass(status)}">${status}</span></td>
     </tr>`;
   }).join('');
   document.getElementById('signalCountText').textContent = `Hiển thị 1 - ${rows.length} của ${signalList().length} tín hiệu`;
