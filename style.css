@@ -439,6 +439,21 @@ body::after {
   transition: transform 220ms ease, border-color 220ms ease, box-shadow 220ms ease, background 220ms ease, opacity 220ms ease;
 }
 
+.kpi-card,
+.panel,
+.latest-card,
+.risk-banner,
+.filter-bar,
+.mini-kpi,
+.insight-row,
+.event-card {
+  position: relative;
+  z-index: 1;
+  transform: translateZ(0);
+  transform-origin: center;
+  will-change: transform;
+}
+
 .glow-card,
 .detail-panel {
   border-color: rgba(103, 240, 92, 0.56);
@@ -450,12 +465,46 @@ body::after {
   .panel:hover,
   .latest-card:hover,
   .risk-banner:hover,
+  .filter-bar:hover,
   .mini-kpi:hover,
   .insight-row:hover,
   .event-card:hover {
-    transform: translateY(-3px);
-    border-color: rgba(103, 240, 92, 0.42);
-    box-shadow: var(--deep-shadow), 0 0 26px rgba(103, 240, 92, 0.11), inset 0 0 30px rgba(103, 240, 92, 0.035);
+    z-index: 12;
+    transform: translateY(-6px) scale(1.006);
+    border-color: rgba(103, 240, 92, 0.66);
+    background:
+      linear-gradient(180deg, rgba(16, 42, 50, 0.92), rgba(7, 22, 29, 0.86)),
+      radial-gradient(circle at 14% 0%, rgba(103, 240, 92, 0.075), transparent 44%),
+      radial-gradient(circle at 100% 0%, rgba(55, 200, 255, 0.07), transparent 38%);
+    box-shadow:
+      0 30px 78px rgba(0, 0, 0, 0.56),
+      0 16px 36px rgba(0, 0, 0, 0.30),
+      0 0 34px rgba(103, 240, 92, 0.17),
+      0 0 46px rgba(55, 200, 255, 0.11),
+      inset 0 1px 0 rgba(255, 255, 255, 0.08),
+      inset 0 0 36px rgba(103, 240, 92, 0.052);
+  }
+
+  .latest-card:hover,
+  .glow-card:hover,
+  .detail-panel:hover {
+    border-color: rgba(103, 240, 92, 0.78);
+    box-shadow:
+      0 34px 86px rgba(0, 0, 0, 0.58),
+      0 0 44px rgba(103, 240, 92, 0.24),
+      0 0 54px rgba(55, 200, 255, 0.12),
+      inset 0 1px 0 rgba(255, 255, 255, 0.09),
+      inset 0 0 44px rgba(103, 240, 92, 0.07);
+  }
+
+  .risk-banner:hover {
+    border-color: rgba(255, 216, 118, 0.82);
+    box-shadow:
+      0 30px 78px rgba(0, 0, 0, 0.54),
+      0 0 34px rgba(255, 194, 71, 0.18),
+      0 0 38px rgba(103, 240, 92, 0.09),
+      inset 0 -8px 0 rgba(255, 194, 71, 0.09),
+      inset 0 0 34px rgba(255, 194, 71, 0.045);
   }
 
   .filter:hover,
@@ -799,10 +848,34 @@ body.data-refreshing .live-badge {
   }
 }
 
+@media (hover: hover) {
+  .app .kpi-card:hover,
+  .app .panel:hover,
+  .app .latest-card:hover,
+  .app .risk-banner:hover,
+  .app .filter-bar:hover,
+  .app .mini-kpi:hover,
+  .app .insight-row:hover,
+  .app .event-card:hover {
+    transform: translateY(-6px) scale(1.006) !important;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   * {
     animation: none !important;
     transition: none !important;
     scroll-behavior: auto !important;
+  }
+
+  .kpi-card:hover,
+  .panel:hover,
+  .latest-card:hover,
+  .risk-banner:hover,
+  .filter-bar:hover,
+  .mini-kpi:hover,
+  .insight-row:hover,
+  .event-card:hover {
+    transform: none !important;
   }
 }
