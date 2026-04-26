@@ -35,6 +35,54 @@ const fmtR = (value) => {
 const clsDir = (d) => safeStatus(d) === 'LONG' ? 'long' : 'short';
 const iconFor = (symbol = '') => coinIconMap[safeStatus(symbol).replace('USDT', '')] || '◎';
 const metricChanged = (...keys) => keys.some(key => changedMetrics.has(key));
+const readTradeNumber = (value) => {
+  if (value === undefined || value === null || value === '') return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+};
+const internalPublicTextPattern = /\b(?:SWING_M15|SNIPER_M5|SCALP_M1|MANUAL_ENTRY|TREND|PUBLIC)\b|Hệ thống|Chiến lược|Nguồn/g;
+
+function sanitizePublicText(value) {
+  const text = safeStatus(value)
+    .replace(internalPublicTextPattern, '')
+    .replace(/\s{2,}/g, ' ')
+    .replace(/\s+([,.;:])/g, '$1')
+    .trim();
+  return text || '--';
+}
+
+function formatRiskReward(signal = {}) {
+  const entry = readTradeNumber(signal.entry);
+  const sl = readTradeNumber(signal.sl);
+  const tp1 = readTradeNumber(signal.tp1);
+  const tp2 = readTradeNumber(signal.tp2);
+  const direction = safeStatus(signal.direction);
+
+  if ([entry, sl, tp1, tp2].some(value => value === null) || !['LONG', 'SHORT'].includes(direction)) return '--';
+
+  const risk = direction === 'LONG'
+    ? Math.abs(entry - sl)
+    : Math.abs(sl - entry);
+  if (risk <= 0) return '--';
+
+  const rr1 = direction === 'LONG'
+    ? Math.abs(tp1 - entry) / risk
+    : Math.abs(entry - tp1) / risk;
+  const rr2 = direction === 'LONG'
+    ? Math.abs(tp2 - entry) / risk
+    : Math.abs(entry - tp2) / risk;
+  if (![rr1, rr2].every(Number.isFinite)) return '--';
+
+  return `TP1 ${rr1.toFixed(1)}R · TP2 ${rr2.toFixed(1)}R`;
+}
+
+function publicLogType(type) {
+  return type === 'Hệ thống' ? 'Trạng thái' : safe(type);
+}
+
+function logFilterValue(value) {
+  return value === 'status' ? 'Hệ thống' : value;
+}
 
 const trackedMetrics = {
   'summary.total_signals': data => safeNumber(data?.summary?.total_signals),
@@ -183,7 +231,7 @@ function renderHome() {
     </div>
     <div class="latest-extra">
       ${field('Trạng thái', `<span class="badge info ${metricChanged('latest_signal.status') ? 'value-updated' : ''}">${latestStatus}</span>`)}
-      ${field('Hệ thống', l.system, 'num-cyan')}
+      ${field('R:R', formatRiskReward(l), 'num-cyan')}
       ${field('Độ tự tin', l.confidence, 'num-green')}
       ${field('Thời gian', l.created_at)}
     </div>
@@ -195,8 +243,8 @@ function renderHome() {
     : '<tr><td colspan="7" class="empty-state">Chưa có lệnh đang chạy</td></tr>';
 
   document.getElementById('livePanelList').innerHTML = arr(dashboardData.live_panel).map(item => {
-    const status = safe(item.status);
-    const note = safe(item.note);
+    const status = sanitizePublicText(item.status);
+    const note = sanitizePublicText(item.note);
     return `<div class="live-row"><strong>${safe(item.symbol)}</strong><span><i class="state-dot ${safeStatus(status).includes('lệnh') ? 'green' : ''}"></i>${status}</span><span class="${safeStatus(note).includes('Chờ') ? 'num-red' : safeStatus(note).includes('setup') ? 'num-green' : ''}">${note}</span></div>`;
   }).join('');
   renderSystemMini('systemMini');
@@ -277,7 +325,7 @@ function renderSignalTable() {
     return `<tr class="${idx === selectedSignalIndex ? 'selected' : ''}" data-signal-index="${idx}">
       <td><strong><span class="coin-icon" style="width:30px;height:30px;font-size:14px;margin-right:8px">${iconFor(sig.symbol)}</span>${safe(sig.symbol, 'ETHUSDT')}</strong></td>
       <td class="${clsDir(sig.direction)}"><strong>${safe(sig.direction, 'LONG')}</strong></td>
-      <td class="num-cyan">${safe(sig.system)}</td><td>${safe(sig.timeframe)}</td><td>${safe(sig.entry)}</td><td class="num-red">${safe(sig.sl)}</td><td class="num-green">${safe(sig.tp1)}</td><td class="num-green">${safe(sig.tp2)}</td>
+      <td class="num-cyan">${formatRiskReward(sig)}</td><td>${safe(sig.timeframe)}</td><td>${safe(sig.entry)}</td><td class="num-red">${safe(sig.sl)}</td><td class="num-green">${safe(sig.tp1)}</td><td class="num-green">${safe(sig.tp2)}</td>
       <td><span class="badge ${statusClass(status)}">${status}</span></td><td>${safe(sig.time)}<br><small>${safe(sig.date)}</small></td>
     </tr>`;
   }).join('');
@@ -304,8 +352,8 @@ function renderSignalDetail(sig = {}) {
 
   document.getElementById('signalDetail').innerHTML = `<div class="panel-title">◎ Chi tiết tín hiệu</div>
     <div class="signal-symbol" style="margin-bottom:16px"><span class="coin-icon">${iconFor(symbol)}</span><span class="big-symbol">${symbol}</span><span class="badge ${clsDir(direction)}">${direction}</span></div>
-    ${detailRow('Hệ thống', safe(sig.system), 'num-cyan')}${detailRow('Khung thời gian', safe(sig.timeframe))}${detailRow('Entry', safe(sig.entry))}${detailRow('Stop Loss (SL)', safe(sig.sl), 'num-red')}${detailRow('Take Profit 1 (TP1)', safe(sig.tp1), 'num-green')}${detailRow('Take Profit 2 (TP2)', safe(sig.tp2), 'num-green')}${detailRow('Độ tự tin', safe(sig.confidence), 'num-green')}${detailRow('Trạng thái', `<span class="badge ${statusClass(status)}">${status}</span>`)}${detailRow('Thời gian', timeText)}
-    <div class="note-box"><strong class="num-green">ⓘ Ghi chú</strong><br>${safe(sig.note, 'Không có ghi chú')}</div>`;
+    ${detailRow('R:R', formatRiskReward(sig), 'num-cyan')}${detailRow('Khung thời gian', safe(sig.timeframe))}${detailRow('Entry', safe(sig.entry))}${detailRow('Stop Loss (SL)', safe(sig.sl), 'num-red')}${detailRow('Take Profit 1 (TP1)', safe(sig.tp1), 'num-green')}${detailRow('Take Profit 2 (TP2)', safe(sig.tp2), 'num-green')}${detailRow('Độ tự tin', safe(sig.confidence), 'num-green')}${detailRow('Trạng thái', `<span class="badge ${statusClass(status)}">${status}</span>`)}${detailRow('Thời gian', timeText)}
+    <div class="note-box"><strong class="num-green">ⓘ Ghi chú</strong><br>${sanitizePublicText(sig.note) === '--' ? 'Không có ghi chú' : sanitizePublicText(sig.note)}</div>`;
 }
 
 function detailRow(label, value, cls = '') { return `<div class="detail-row"><span>${label}</span><strong class="${cls}">${safe(value)}</strong></div>`; }
@@ -396,9 +444,9 @@ function eventCard(icon, label, value, red=false) { return `<div class="event-ca
 
 function renderSystemSummary() {
   const sys = dashboardData.system || {};
-  document.getElementById('systemSummary').innerHTML = `<div class="panel-title">〽 Tóm tắt hệ thống</div>
+  document.getElementById('systemSummary').innerHTML = `<div class="panel-title">〽 Tóm tắt trạng thái</div>
     ${systemRow('Risk lock hôm nay', sys.risk_lock ? 'Bật' : 'Tắt', sys.risk_lock)}
-    ${systemRow('Dữ liệu', sys.data_status, false)}${systemRow('Lỗi gần nhất', sys.last_error, false)}${systemRow('Scan M1 cuối', sys.last_m1_scan, false, 'num-cyan')}${systemRow('Scan M5 cuối', sys.last_m5_scan, false, 'num-cyan')}${systemRow('Active positions', sys.active_positions, false)}`;
+    ${systemRow('Trạng thái dữ liệu', sys.data_status, false)}${systemRow('Lỗi gần nhất', sys.last_error, false)}${systemRow('Quét M1 cuối', sys.last_m1_scan, false, 'num-cyan')}${systemRow('Quét M5 cuối', sys.last_m5_scan, false, 'num-cyan')}${systemRow('Vị thế active', sys.active_positions, false)}`;
 }
 function systemRow(label, value, danger=false, cls='num-green') { return `<div class="system-row"><span>${label}</span><strong class="${danger?'num-red':cls}">${safe(value)}</strong></div>`; }
 
@@ -406,7 +454,7 @@ function renderActivityLogs() {
   const search = (document.getElementById('logSearch')?.value || '').toLowerCase();
   const logs = arr(dashboardData.activity_logs).filter(l => (activeLogFilter === 'all' || l.type === activeLogFilter) && safeStatus(l.message).toLowerCase().includes(search));
   document.getElementById('activityLogs').innerHTML = logs.length
-    ? logs.map(log => `<div class="timeline-row"><span class="timeline-time">${safe(log.time)}</span><span class="log-type ${typeClass(log.type)}">${safe(log.type)}</span><span>${highlightMessage(log.message)}</span></div>`).join('')
+    ? logs.map(log => `<div class="timeline-row"><span class="timeline-time">${safe(log.time)}</span><span class="log-type ${typeClass(log.type)}">${publicLogType(log.type)}</span><span>${highlightMessage(log.message)}</span></div>`).join('')
     : '<div class="empty-state">Chưa có nhật ký</div>';
 }
 
@@ -416,7 +464,7 @@ function logRow(log) {
 function dotClass(type) { return type === 'Cảnh báo' ? 'yellow' : type === 'Thoát lệnh' ? 'red' : type === 'Vào lệnh' ? 'green' : ''; }
 function typeClass(type) { return type === 'Cảnh báo' ? 'num-red' : type === 'Thoát lệnh' ? 'num-red' : type === 'Vào lệnh' ? 'num-green' : type === 'Tín hiệu' ? 'num-cyan' : 'num-cyan'; }
 function highlightMessage(message) {
-  return safeStatus(message)
+  return sanitizePublicText(message)
     .replace(/\bLONG\b/g, '<strong class="pos">LONG</strong>')
     .replace(/\bSHORT\b/g, '<strong class="neg">SHORT</strong>')
     .replace(/TP1|TP2/g, '<strong class="num-green">$&</strong>')
@@ -454,7 +502,7 @@ function bindEvents() {
   document.querySelectorAll('.log-pill').forEach(button => button.addEventListener('click', () => {
     document.querySelectorAll('.log-pill').forEach(b => b.classList.remove('active'));
     button.classList.add('active');
-    activeLogFilter = button.dataset.log;
+    activeLogFilter = logFilterValue(button.dataset.log);
     renderActivityLogs();
   }));
   document.getElementById('logSearch')?.addEventListener('input', renderActivityLogs);
