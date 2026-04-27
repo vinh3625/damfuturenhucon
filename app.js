@@ -299,7 +299,7 @@ function renderActiveTrades(activeTrades = []) {
 function renderHomePerformancePanels() {
   const s = dashboardData.summary || {};
   renderLineChart('homeLineChart');
-  renderDistribution('homeDistribution');
+  renderHomeDistribution();
 
   document.getElementById('homePerformanceStats').innerHTML = [
     homeMetric('Tổng PnL', fmtR(s.total_r), safeNumber(s.total_r) < 0 ? 'num-red' : 'num-green'),
@@ -314,28 +314,98 @@ function homeMetric(label, value, cls = '') {
   return `<div class="home-mini-stat"><span>${label}</span><strong class="${cls}">${safe(value)}</strong></div>`;
 }
 
+function formatPercent(value) {
+  const number = safeNumber(value);
+  return `${Number.isInteger(number) ? number : number.toFixed(1)}%`;
+}
+
+function percentOf(count, total) {
+  const base = safeNumber(total);
+  if (base <= 0) return 0;
+  return (safeNumber(count) / base) * 100;
+}
+
+function readDirectionCount(direction) {
+  const s = dashboardData.summary || {};
+  const key = `${direction.toLowerCase()}_signals`;
+  if (s[key] !== undefined) return safeNumber(s[key]);
+  return arr(dashboardData.signals).filter(sig => sig.direction === direction).length;
+}
+
+function readOutcomeCounts() {
+  const counts = { SL: 0, TP1: 0, TP2: 0 };
+  arr(dashboardData.result_distribution).forEach(item => {
+    const label = safeStatus(item.label).toUpperCase();
+    if (label.includes('TP1')) counts.TP1 += safeNumber(item.count);
+    else if (label.includes('TP2')) counts.TP2 += safeNumber(item.count);
+    else if (label.includes('SL')) counts.SL += safeNumber(item.count);
+  });
+
+  if (Object.values(counts).some(Boolean)) return counts;
+
+  arr(dashboardData.recent_results).forEach(item => {
+    const result = safeStatus(item.result).toUpperCase();
+    if (result.includes('TP1')) counts.TP1 += 1;
+    else if (result.includes('TP2')) counts.TP2 += 1;
+    else if (result.includes('SL')) counts.SL += 1;
+  });
+
+  return counts;
+}
+
+function homeDonutBackground(items) {
+  const total = items.reduce((sum, item) => sum + safeNumber(item.count), 0);
+  if (total <= 0) return 'conic-gradient(rgba(255,255,255,.08) 0 100%)';
+
+  let start = 0;
+  const segments = items.map(item => {
+    const end = start + (safeNumber(item.count) / total) * 100;
+    const segment = `${item.color} ${start.toFixed(3)}% ${end.toFixed(3)}%`;
+    start = end;
+    return segment;
+  });
+  return `conic-gradient(${segments.join(', ')})`;
+}
+
+function renderHomeDistribution() {
+  const total = safeNumber(dashboardData.summary?.total_signals);
+  const outcomes = readOutcomeCounts();
+  const items = [
+    { label: 'LONG', count: readDirectionCount('LONG'), color: 'var(--green)', cls: 'num-green' },
+    { label: 'SHORT', count: readDirectionCount('SHORT'), color: 'var(--red)', cls: 'num-red' },
+    { label: 'SL', count: outcomes.SL, color: 'var(--red)', cls: 'num-red' },
+    { label: 'TP1', count: outcomes.TP1, color: 'var(--cyan)', cls: 'num-cyan' },
+    { label: 'TP2', count: outcomes.TP2, color: 'rgba(72, 168, 255, .95)', cls: 'num-cyan' }
+  ];
+
+  const target = document.getElementById('homeDistribution');
+  if (!target) return;
+  target.innerHTML = `
+    <div class="home-donut" style="background:${homeDonutBackground(items)}">
+      <div class="home-donut-inner"><strong>${total}</strong><span>Tổng</span></div>
+    </div>
+    <div class="home-distribution-legend">
+      ${items.map(item => `<div class="home-legend-item"><span class="dot" style="background:${item.color}"></span><span>${item.label}</span><strong class="${item.cls}">${safeNumber(item.count)} (${formatPercent(percentOf(item.count, total))})</strong></div>`).join('')}
+    </div>`;
+}
+
 function renderHomeSignalStats() {
   const s = dashboardData.summary || {};
-  const signals = arr(dashboardData.signals);
-  const longCount = signals.filter(sig => sig.direction === 'LONG').length;
-  const shortCount = signals.filter(sig => sig.direction === 'SHORT').length;
-  const pendingCount = s.pending_signals ?? signals.filter(sig => safeStatus(sig.status).includes('Chờ')).length;
-  const closedCount = s.closed_signals ?? signals.filter(sig => {
-    const status = safeStatus(sig.status);
-    return ['TP1', 'TP2', 'SL', 'Thoát'].some(x => status.includes(x));
-  }).length;
-  const canceledCount = signals.filter(sig => /hủy|huỷ|cancel/i.test(safeStatus(sig.status))).length;
+  const total = safeNumber(s.total_signals);
+  const longCount = readDirectionCount('LONG');
+  const shortCount = readDirectionCount('SHORT');
+  const pendingCount = safeNumber(s.pending_signals);
+  const closedCount = safeNumber(s.closed_signals);
   const rows = [
-    ['Tổng tín hiệu', safeNumber(s.total_signals, signals.length), 'num-cyan'],
-    ['LONG', longCount, 'num-green'],
-    ['SHORT', shortCount, 'num-red'],
-    ['Đang chờ', safeNumber(pendingCount), 'num-cyan'],
-    ['Đã đóng', safeNumber(closedCount), 'num-green']
+    ['◎', 'Tổng tín hiệu', total, '', false],
+    ['↗', 'LONG', longCount, 'num-green', true],
+    ['↘', 'SHORT', shortCount, 'num-red', true],
+    ['◌', 'Đang chờ', pendingCount, 'num-cyan', true],
+    ['✓', 'Đã đóng', closedCount, 'num-green', true]
   ];
-  if (canceledCount) rows.push(['Đã hủy', canceledCount, 'num-red']);
 
   document.getElementById('homeSignalStats').innerHTML = rows
-    .map(([label, value, cls]) => `<div class="home-stat-row"><span>${label}</span><strong class="${cls}">${safe(value)}</strong></div>`)
+    .map(([icon, label, value, cls, showPercent]) => `<div class="home-stat-row"><span class="home-stat-icon">${icon}</span><span class="home-stat-label">${label}</span><strong class="${cls}">${safeNumber(value)}${showPercent ? ` (${formatPercent(percentOf(value, total))})` : ''}</strong></div>`)
     .join('');
 }
 
