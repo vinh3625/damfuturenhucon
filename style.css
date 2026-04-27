@@ -248,6 +248,13 @@ label { color: #b5c1c4; display: flex; align-items: center; gap: 8px; }
   font-weight: 900;
   white-space: nowrap;
 }
+.journal-stat-card,
+.system-status-card {
+  position: relative;
+  z-index: 1;
+  transform-origin: center;
+  transition: transform 180ms ease, background 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+}
 .trade-journal-wrap { max-width: 100%; overflow-x: auto; }
 .trade-journal-table { min-width: 1180px; }
 .trade-journal-table th,
@@ -613,6 +620,17 @@ body::after {
   input:hover {
     border-color: rgba(55, 200, 255, 0.42);
     box-shadow: 0 0 10px rgba(55, 200, 255, 0.10);
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .system-status-card:hover,
+  .journal-stat-card:hover {
+    z-index: 12;
+    transform: translateY(-4px);
+    background: linear-gradient(145deg, #07100E, #0B1714);
+    border-color: rgba(98, 255, 111, 0.42);
+    box-shadow: 0 18px 38px rgba(0, 0, 0, .56), 0 0 14px rgba(90, 255, 110, 0.08);
   }
 }
 
@@ -983,7 +1001,9 @@ body.data-refreshing .live-badge {
   .filter-bar:hover,
   .mini-kpi:hover,
   .insight-row:hover,
-  .event-card:hover {
+  .event-card:hover,
+  .system-status-card:hover,
+  .journal-stat-card:hover {
     transform: none !important;
   }
 }
