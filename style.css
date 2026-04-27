@@ -212,64 +212,47 @@ label { color: #b5c1c4; display: flex; align-items: center; gap: 8px; }
 .journal-filter .log-pill {
   padding: 8px 14px;
 }
-.trade-journal-wrap { max-width: 100%; overflow-x: auto; }
-.trade-journal-table { min-width: 1180px; }
-.trade-journal-table tbody tr {
-  cursor: pointer;
+.journal-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
 }
-.trade-journal-table th,
-.trade-journal-table td,
-.journal-system-table th,
-.journal-system-table td {
+.journal-stat-card {
+  min-width: 0;
+  padding: 10px 11px;
+  border: 1px solid rgba(255, 255, 255, .09);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, .035);
+}
+.journal-stat-card span {
+  display: block;
+  color: #aebbbe;
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 1.15;
   white-space: nowrap;
 }
-.trade-journal-table td:last-child,
-.journal-system-table td:last-child {
+.journal-stat-card strong {
+  display: block;
+  margin-top: 5px;
+  font-size: 20px;
+  line-height: 1;
+  font-weight: 900;
+  white-space: nowrap;
+}
+.trade-journal-wrap { max-width: 100%; overflow-x: auto; }
+.trade-journal-table { min-width: 1180px; }
+.trade-journal-table th,
+.trade-journal-table td {
+  white-space: nowrap;
+}
+.trade-journal-table td:last-child {
   white-space: normal;
 }
 .journal-time {
   color: var(--cyan);
   font-weight: 800;
-}
-.journal-lower-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(320px, 380px);
-  gap: 16px;
-  align-items: start;
-}
-.journal-system-panel {
-  margin-top: 0;
-  min-width: 0;
-}
-.journal-system-table {
-  min-width: 680px;
-}
-.trade-detail-panel {
-  min-width: 0;
-}
-.trade-detail-list {
-  display: grid;
-  gap: 0;
-}
-.trade-detail-row {
-  display: grid;
-  grid-template-columns: minmax(120px, 1fr) auto;
-  gap: 12px;
-  align-items: center;
-  padding: 10px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, .08);
-}
-.trade-detail-row:last-child {
-  border-bottom: 0;
-}
-.trade-detail-row span {
-  color: #c8d2d1;
-  min-width: 0;
-}
-.trade-detail-row strong {
-  min-width: 0;
-  text-align: right;
-  white-space: normal;
 }
 .muted-text {
   color: var(--muted);
@@ -281,9 +264,9 @@ label { color: #b5c1c4; display: flex; align-items: center; gap: 8px; }
 @media (max-width: 1100px) {
   .browser-shell { aspect-ratio: auto; }
   .app-header, .two-col, .chart-layout, .three-col, .signals-layout, .logs-layout { grid-template-columns: 1fr; }
-  .journal-lower-grid { grid-template-columns: 1fr; }
   .journal-card-head { align-items: flex-start; flex-direction: column; }
   .journal-filter { justify-content: flex-start; }
+  .journal-stats-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .kpi-grid { grid-template-columns: repeat(2, 1fr); }
   .latest-grid { grid-template-columns: 1fr 1fr; }
   .target-mark { display:none; }
@@ -294,6 +277,7 @@ label { color: #b5c1c4; display: flex; align-items: center; gap: 8px; }
 @media (max-width: 720px) {
   .app { padding: 18px; }
   .kpi-grid, .mini-kpi-row { grid-template-columns: 1fr; }
+  .journal-stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .browser-topbar, .address-bar { display:none; }
   .latest-extra, .latest-grid { grid-template-columns: 1fr; }
   .live-row, .result-row, .log-table .timeline-row, .log-table-head { grid-template-columns: 1fr; }

@@ -3,7 +3,6 @@ let activeSignalFilter = 'all';
 let selectedSignalIndex = 0;
 let activeLogFilter = 'all';
 let activeTradeJournalFilter = 'all';
-let selectedTradeJournalIndex = 0;
 let eventsBound = false;
 let previousMetricSnapshot = null;
 let changedMetrics = new Set();
@@ -265,7 +264,7 @@ function ensureSystemTab() {
 function ensureTradeJournalLayout() {
   const logs = document.getElementById('tab-logs');
   if (!logs) return;
-  if (document.getElementById('tradeJournalBody') && document.getElementById('tradeJournalDetail')) return;
+  if (document.getElementById('tradeJournalBody') && document.getElementById('journalQuickStats')) return;
 
   logs.innerHTML = `
     <section class="panel trade-journal-panel">
@@ -283,29 +282,14 @@ function ensureTradeJournalLayout() {
           ].map(([value, label], index) => `<button class="log-pill journal-pill ${index === 0 ? 'active' : ''}" data-journal="${value}">${label}</button>`).join('')}
         </div>
       </div>
+      <div class="journal-stats-grid" id="journalQuickStats"></div>
       <div class="table-wrap trade-journal-wrap">
         <table class="trade-journal-table">
           <thead><tr><th>Thời gian</th><th>Cặp</th><th>Hướng</th><th>Khung</th><th>Entry</th><th>SL</th><th>TP1</th><th>TP2</th><th>Giá trị lệnh</th><th>Trạng thái</th><th>Kết quả</th></tr></thead>
           <tbody id="tradeJournalBody"></tbody>
         </table>
       </div>
-    </section>
-
-    <div class="journal-lower-grid">
-      <section class="panel journal-system-panel">
-        <div class="panel-title">Nhật ký hệ thống gần đây</div>
-        <div class="table-wrap">
-          <table class="journal-system-table">
-            <thead><tr><th>Thời gian</th><th>Loại</th><th>Sự kiện</th></tr></thead>
-            <tbody id="journalSystemLogsBody"></tbody>
-          </table>
-        </div>
-      </section>
-      <aside class="panel trade-detail-panel">
-        <div class="panel-title">Chi tiết giao dịch</div>
-        <div id="tradeJournalDetail" class="trade-detail-list"></div>
-      </aside>
-    </div>`;
+    </section>`;
 }
 
 function renderHome() {
@@ -748,7 +732,6 @@ function renderDistribution(targetId = 'distribution') {
 function renderLogs() {
   ensureTradeJournalLayout();
   renderTradeJournal();
-  renderJournalSystemLogs();
   hideLogSystemSummary();
 }
 
@@ -778,7 +761,8 @@ function normalizeJournalRow(row = {}, fallback = {}) {
     tp2: firstValue(row.tp2, fallback.tp2),
     position_value: firstValue(row.position_value, row.positionValue, row.order_value, row.value, fallback.position_value),
     status,
-    result: firstValue(row.result, row.outcome, row.pnl_result, journalResultFromStatus(status), fallback.result)
+    result: firstValue(row.result, row.outcome, row.pnl_result, journalResultFromStatus(status), fallback.result),
+    r: firstValue(row.r, row.rr, row.r_multiple, row.result_r, row.pnl_r, fallback.r)
   };
 }
 
@@ -829,7 +813,7 @@ function matchesTradeJournalFilter(row) {
   const direction = safeStatus(row.direction).toUpperCase();
 
   if (activeTradeJournalFilter === 'running') return status.includes('đang chạy') || status.includes('active') || status.includes('running');
-  if (activeTradeJournalFilter === 'closed') return status.includes('đã đóng') || status.includes('closed') || !!normalizeOutcomeLabel(result);
+  if (activeTradeJournalFilter === 'closed') return status.includes('đã đóng') || status.includes('closed');
   if (activeTradeJournalFilter === 'tp') return /\bTP(?:1|2)?\b/.test(result);
   if (activeTradeJournalFilter === 'sl') return /\bSL\b/.test(result) || result.includes('STOP LOSS');
   if (activeTradeJournalFilter === 'long') return direction === 'LONG';
@@ -854,8 +838,72 @@ function formatPositionValue(value) {
 function journalResultClass(result) {
   const text = safeStatus(result).toUpperCase();
   if (text.includes('SL')) return 'num-red';
-  if (text.includes('TP')) return 'num-green';
+  if (text.includes('TP2')) return 'num-green';
+  if (text.includes('TP')) return 'num-cyan';
   return 'muted-text';
+}
+
+function compactResultLabel(result) {
+  const text = safeStatus(result).trim();
+  const upper = text.toUpperCase();
+  if (!text || text === '--') return '--';
+  if (upper.includes('TP1')) return 'TP1';
+  if (upper.includes('TP2')) return 'TP2';
+  if (/\bTP\b/.test(upper)) return 'TP';
+  if (/\bSL\b/.test(upper) || upper.includes('STOP LOSS')) return 'SL';
+  return text;
+}
+
+function formatJournalR(value) {
+  if (value === undefined || value === null || value === '') return '';
+  const number = Number(value);
+  if (!Number.isFinite(number)) return '';
+  if (number === 0) return '0R';
+  return `${number > 0 ? '+' : ''}${number.toFixed(1)}R`;
+}
+
+function formatJournalResult(row = {}) {
+  const status = safeStatus(row.status).toLowerCase();
+  if (status.includes('đang chạy') || status.includes('running') || status.includes('active') || status.includes('chờ')) return '--';
+
+  const label = compactResultLabel(row.result);
+  if (label === '--') return '--';
+  const rText = formatJournalR(row.r);
+  return rText ? `${label} (${rText})` : label;
+}
+
+function isJournalRunning(row) {
+  const status = safeStatus(row.status).toLowerCase();
+  return status.includes('đang chạy') || status.includes('active') || status.includes('running');
+}
+
+function isJournalClosed(row) {
+  const status = safeStatus(row.status).toLowerCase();
+  return status.includes('đã đóng') || status.includes('closed');
+}
+
+function journalResultText(row) {
+  return safeStatus(row.result).toUpperCase();
+}
+
+function statCard(label, value, cls = '') {
+  return `<div class="journal-stat-card"><span>${label}</span><strong class="${cls}">${safe(value)}</strong></div>`;
+}
+
+function renderJournalQuickStats(rows) {
+  const target = document.getElementById('journalQuickStats');
+  if (!target) return;
+  const totalR = rows.reduce((sum, row) => sum + safeNumber(row.r), 0);
+  target.innerHTML = [
+    statCard('Tổng lệnh', rows.length),
+    statCard('Đang chạy', rows.filter(isJournalRunning).length, 'num-cyan'),
+    statCard('Đã đóng', rows.filter(isJournalClosed).length, 'num-green'),
+    statCard('Thoát sớm', rows.filter(row => /THOÁT SỚM|EARLY/.test(journalResultText(row))).length, 'num-cyan'),
+    statCard('SL', rows.filter(row => /\bSL\b|STOP LOSS/.test(journalResultText(row))).length, 'num-red'),
+    statCard('TP1', rows.filter(row => /\bTP1\b/.test(journalResultText(row))).length, 'num-cyan'),
+    statCard('TP2', rows.filter(row => /\bTP2\b/.test(journalResultText(row))).length, 'num-green'),
+    statCard('R:R', formatJournalR(totalR) || '0R', totalR < 0 ? 'num-red' : totalR > 0 ? 'num-green' : '')
+  ].join('');
 }
 
 function renderTradeJournal() {
@@ -867,13 +915,13 @@ function renderTradeJournal() {
   });
 
   const rows = tradeJournalRows().filter(matchesTradeJournalFilter);
-  if (selectedTradeJournalIndex >= rows.length) selectedTradeJournalIndex = 0;
+  renderJournalQuickStats(rows);
   target.innerHTML = rows.length
-    ? rows.map((row, index) => {
+    ? rows.map(row => {
       const direction = safe(row.direction);
       const directionClass = direction === 'LONG' ? 'long' : direction === 'SHORT' ? 'short' : 'info';
-      const result = safe(row.result);
-      return `<tr class="${index === selectedTradeJournalIndex ? 'selected' : ''}" data-journal-index="${index}">
+      const result = formatJournalResult(row);
+      return `<tr>
         <td class="journal-time">${formatSystemDateTime(row.time)}</td>
         <td><strong>${safe(row.symbol)}</strong></td>
         <td><span class="badge ${directionClass}">${direction}</span></td>
@@ -888,81 +936,6 @@ function renderTradeJournal() {
       </tr>`;
     }).join('')
     : '<tr><td colspan="11" class="empty-state">Chưa có nhật ký giao dịch.</td></tr>';
-  renderTradeJournalDetail(rows[selectedTradeJournalIndex]);
-  target.querySelectorAll('tr[data-journal-index]').forEach(row => {
-    row.addEventListener('click', () => {
-      selectedTradeJournalIndex = Number(row.dataset.journalIndex) || 0;
-      renderTradeJournal();
-    });
-  });
-}
-
-function tradeDetailRow(label, value, cls = '') {
-  return `<div class="trade-detail-row"><span>${label}</span><strong class="${cls}">${safe(value)}</strong></div>`;
-}
-
-function renderTradeJournalDetail(row) {
-  const target = document.getElementById('tradeJournalDetail');
-  if (!target) return;
-  if (!row) {
-    target.innerHTML = '<div class="empty-state">Chưa có giao dịch được chọn.</div>';
-    return;
-  }
-
-  const direction = safe(row.direction);
-  const directionClass = direction === 'LONG' ? 'long' : direction === 'SHORT' ? 'short' : 'info';
-  const result = safe(row.result);
-  target.innerHTML = [
-    tradeDetailRow('Cặp', safe(row.symbol)),
-    tradeDetailRow('Hướng', `<span class="badge ${directionClass}">${direction}</span>`),
-    tradeDetailRow('Khung', safe(row.timeframe)),
-    tradeDetailRow('Entry', formatTradeNumber(row.entry)),
-    tradeDetailRow('Stop Loss', formatTradeNumber(row.sl), 'num-red'),
-    tradeDetailRow('Take Profit 1', formatTradeNumber(row.tp1), 'num-cyan'),
-    tradeDetailRow('Take Profit 2', formatTradeNumber(row.tp2), 'num-green'),
-    tradeDetailRow('Giá trị lệnh', formatPositionValue(row.position_value)),
-    tradeDetailRow('Trạng thái', `<span class="badge ${statusClass(row.status)}">${safe(row.status)}</span>`),
-    tradeDetailRow('Kết quả', result, journalResultClass(result)),
-    tradeDetailRow('Thời gian', formatSystemDateTime(row.time), 'num-cyan')
-  ].join('');
-}
-
-function systemJournalRows() {
-  const logs = arr(dashboardData.system?.recent_system_logs);
-  return (logs.length ? logs : arr(dashboardData.activity_logs)).slice(0, 10);
-}
-
-function renderJournalSystemLogs() {
-  const target = document.getElementById('journalSystemLogsBody');
-  if (!target) return;
-  const rows = systemJournalRows();
-  target.innerHTML = rows.length
-    ? rows.map(log => `<tr><td class="journal-time">${formatSystemDateTime(log.time || log.created_at)}</td><td><span class="log-type">${safe(log.type, 'SYSTEM').toUpperCase()}</span></td><td>${highlightMessage(safeStatus(log.message || log.event || log.text).slice(0, 180))}</td></tr>`).join('')
-    : '<tr><td colspan="3" class="empty-state">Chưa có nhật ký hệ thống.</td></tr>';
-}
-
-function dailyHighlightCounts() {
-  const journalRows = tradeJournalRows();
-  if (journalRows.length) {
-    return {
-      signals_created: journalRows.length,
-      entries_executed: journalRows.filter(row => row.entry !== undefined && row.entry !== null && row.entry !== '').length,
-      tp_hit: journalRows.filter(row => /\bTP(?:1|2)?\b/.test(safeStatus(row.result).toUpperCase())).length,
-      sl_hit: journalRows.filter(row => /\bSL\b/.test(safeStatus(row.result).toUpperCase())).length
-    };
-  }
-
-  const logs = arr(dashboardData.activity_logs);
-  if (logs.length) {
-    return {
-      signals_created: logs.filter(log => /SIGNAL|Tín hiệu/i.test(safeStatus(log.type) + safeStatus(log.message))).length,
-      entries_executed: logs.filter(log => /Vào lệnh|entry|entered/i.test(safeStatus(log.type) + safeStatus(log.message))).length,
-      tp_hit: logs.filter(log => /\bTP(?:1|2)?\b/i.test(safeStatus(log.message))).length,
-      sl_hit: logs.filter(log => /\bSL\b/i.test(safeStatus(log.message))).length
-    };
-  }
-
-  return dashboardData.daily_events || {};
 }
 
 function renderSystemSummary() {
@@ -1212,7 +1185,6 @@ function bindEvents() {
     button.classList.add('active');
     if (button.classList.contains('journal-pill')) {
       activeTradeJournalFilter = button.dataset.journal || 'all';
-      selectedTradeJournalIndex = 0;
       renderTradeJournal();
     } else {
       activeLogFilter = logFilterValue(button.dataset.log);
