@@ -402,7 +402,7 @@ body::after {
 
 .app-header {
   position: fixed;
-  top: 8px;
+  top: 4px;
   left: 50%;
   transform: translateX(-50%);
   width: calc(100% - 32px);
