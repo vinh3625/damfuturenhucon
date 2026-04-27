@@ -216,7 +216,7 @@ function ensureSystemTab() {
   if (app && !document.getElementById('tab-system')) {
     app.insertAdjacentHTML('beforeend', `
       <section id="tab-system" class="tab-panel system-tab">
-        <div class="kpi-grid system-kpi-grid" id="systemKpis"></div>
+        <div class="system-overview-grid" id="systemKpis"></div>
 
         <section class="panel system-scan-panel">
           <div class="panel-title">⟳ Nhịp quét tín hiệu</div>
@@ -744,6 +744,17 @@ function systemListRow(label, value, cls = '') {
   return `<div class="system-list-row"><span>${label}</span><strong class="${cls}">${safe(value)}</strong></div>`;
 }
 
+function systemStatusCard(icon, label, value, note, cls = '') {
+  return `<article class="system-status-card">
+    <div class="system-card-icon">${icon}</div>
+    <div class="system-card-content">
+      <div class="system-card-label">${label}</div>
+      <div class="system-card-value ${cls}">${safe(value)}</div>
+      <div class="system-card-note">${note}</div>
+    </div>
+  </article>`;
+}
+
 function renderSystemTab() {
   const sys = dashboardData.system || {};
   const summary = dashboardData.summary || {};
@@ -755,10 +766,10 @@ function renderSystemTab() {
   const activePositions = safeNumber(sys.active_positions);
 
   document.getElementById('systemKpis').innerHTML = [
-    kpiCard('●', 'Bot trạng thái', botStatus, 'trạng thái vận hành', false),
-    kpiCard('⟳', 'Scan status', scanStatus, 'nhịp quét tín hiệu', false),
-    kpiCard('🛡', 'Risk lock', riskLock, 'kiểm soát rủi ro', !!sys.risk_lock),
-    kpiCard('↔', 'Vị thế active', activePositions, 'đang theo dõi', false)
+    systemStatusCard('●', 'Bot trạng thái', botStatus, 'trạng thái vận hành', 'num-green'),
+    systemStatusCard('⟳', 'Scan status', scanStatus, 'nhịp quét tín hiệu', 'num-cyan'),
+    systemStatusCard('🛡', 'Risk lock', riskLock, 'kiểm soát rủi ro', sys.risk_lock ? 'num-red' : 'num-green'),
+    systemStatusCard('↔', 'Vị thế active', activePositions, 'đang theo dõi', 'num-green')
   ].join('');
 
   document.getElementById('systemScanBody').innerHTML = systemScanRows().map(row => `<tr>
