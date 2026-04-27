@@ -1006,7 +1006,6 @@ body.data-refreshing .live-badge {
   white-space: nowrap;
 }
 
-.watchlist-more,
 .watchlist-empty {
   margin-top: 8px;
   color: var(--muted);

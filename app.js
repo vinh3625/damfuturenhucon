@@ -767,12 +767,9 @@ function renderWatchlistChips(watchlist) {
     </div>`;
   }
 
-  const visibleItems = items.slice(0, 10);
-  const moreCount = Math.max(0, items.length - visibleItems.length);
   return `<div class="watchlist-block">
     <div class="watchlist-label">Watchlist</div>
-    <div class="watchlist-chips">${visibleItems.map(item => `<span class="watchlist-chip">${item}</span>`).join('')}</div>
-    ${moreCount ? `<div class="watchlist-more">+ ${moreCount} cặp khác</div>` : ''}
+    <div class="watchlist-chips">${items.map(item => `<span class="watchlist-chip">${item}</span>`).join('')}</div>
   </div>`;
 }
 
