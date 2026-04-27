@@ -247,7 +247,6 @@ function renderHome() {
     return `<div class="live-row"><strong>${safe(item.symbol)}</strong><span><i class="state-dot ${safeStatus(status).includes('lệnh') ? 'green' : ''}"></i>${status}</span><span class="${safeStatus(note).includes('Chờ') ? 'num-red' : safeStatus(note).includes('setup') ? 'num-green' : ''}">${note}</span></div>`;
   }).join('');
   renderSystemMini('systemMini');
-  renderHomePerformancePanels();
   renderRecentResults();
   renderShortLogs();
 }
@@ -267,47 +266,13 @@ function ensureHomeLayout() {
   bottomGrid?.classList.add('home-bottom-grid');
   riskBanner?.classList.add('home-risk-hidden');
 
-  if (!document.getElementById('homeAnalyticsGrid') && activeGrid) {
-    const analytics = document.createElement('div');
-    analytics.id = 'homeAnalyticsGrid';
-    analytics.className = 'home-analytics-grid';
-    analytics.innerHTML = `
-      <section class="panel home-performance-panel">
-        <div class="panel-title">↗ Hiệu suất 30 ngày</div>
-        <div class="legend home-chart-legend"><span class="dot green"></span> Tổng lợi nhuận (R) <span class="dash"></span> Vốn tham chiếu (0R)</div>
-        <div id="homeLineChart" class="line-chart home-line-chart"></div>
-        <div class="home-metric-strip" id="homePerformanceStats"></div>
-      </section>
-      <section class="panel home-distribution-panel">
-        <div class="panel-title">◔ Phân bổ tín hiệu</div>
-        <div id="homeDistribution" class="distribution home-distribution"></div>
-      </section>
-      <section class="panel home-signal-stats-panel">
-        <div class="panel-title">▦ Thống kê tín hiệu</div>
-        <div id="homeSignalStats" class="home-signal-stats"></div>
-      </section>`;
-    activeGrid.insertAdjacentElement('afterend', analytics);
-  }
+  document.getElementById('homeAnalyticsGrid')?.remove();
 }
 
 function renderActiveTrades(activeTrades = []) {
   document.getElementById('activeTradesBody').innerHTML = activeTrades.length
     ? activeTrades.map(t => tradeRow(t, metricChanged('active_trades.count'))).join('')
     : '<tr><td colspan="7" class="empty-state">Hiện tại không có lệnh nào đang mở</td></tr>';
-}
-
-function renderHomePerformancePanels() {
-  const s = dashboardData.summary || {};
-  renderLineChart('homeLineChart');
-  renderHomeDistribution();
-
-  document.getElementById('homePerformanceStats').innerHTML = [
-    homeMetric('Tổng PnL', fmtR(s.total_r), safeNumber(s.total_r) < 0 ? 'num-red' : 'num-green'),
-    homeMetric('Win rate', `${safeNumber(s.win_rate)}%`, 'num-green'),
-    homeMetric('Số lệnh', safeNumber(s.total_signals), 'num-cyan')
-  ].join('');
-
-  renderHomeSignalStats();
 }
 
 function homeMetric(label, value, cls = '') {
@@ -367,26 +332,44 @@ function homeDonutBackground(items) {
   return `conic-gradient(${segments.join(', ')})`;
 }
 
-function renderHomeDistribution() {
-  const total = safeNumber(dashboardData.summary?.total_signals);
+function readTotalSignals() {
+  const summaryTotal = dashboardData.summary?.total_signals;
+  if (summaryTotal !== undefined && summaryTotal !== null && summaryTotal !== '') return safeNumber(summaryTotal);
+  const signalCount = arr(dashboardData.signals).length;
+  if (signalCount) return signalCount;
+  return Object.values(readOutcomeCounts()).reduce((sum, value) => sum + safeNumber(value), 0);
+}
+
+function signalDistributionItems() {
   const outcomes = readOutcomeCounts();
-  const items = [
+  return [
     { label: 'LONG', count: readDirectionCount('LONG'), color: 'var(--green)', cls: 'num-green' },
     { label: 'SHORT', count: readDirectionCount('SHORT'), color: 'var(--red)', cls: 'num-red' },
     { label: 'SL', count: outcomes.SL, color: 'var(--red)', cls: 'num-red' },
     { label: 'TP1', count: outcomes.TP1, color: 'var(--cyan)', cls: 'num-cyan' },
     { label: 'TP2', count: outcomes.TP2, color: 'rgba(72, 168, 255, .95)', cls: 'num-cyan' }
   ];
+}
 
-  const target = document.getElementById('homeDistribution');
+function renderSignalDistribution(targetId, { showTotalLine = false } = {}) {
+  const total = readTotalSignals();
+  const items = signalDistributionItems();
+
+  const target = document.getElementById(targetId);
   if (!target) return;
+  target.classList.add('home-distribution');
   target.innerHTML = `
     <div class="home-donut" style="background:${homeDonutBackground(items)}">
       <div class="home-donut-inner"><strong>${total}</strong><span>Tổng</span></div>
     </div>
     <div class="home-distribution-legend">
       ${items.map(item => `<div class="home-legend-item"><span class="dot" style="background:${item.color}"></span><span>${item.label}</span><strong class="${item.cls}">${safeNumber(item.count)} (${formatPercent(percentOf(item.count, total))})</strong></div>`).join('')}
-    </div>`;
+    </div>
+    ${showTotalLine ? `<div class="distribution-total-line">Tổng tín hiệu: <strong>${total}</strong></div>` : ''}`;
+}
+
+function renderPerformanceDistribution() {
+  renderSignalDistribution('distribution', { showTotalLine: true });
 }
 
 function renderHomeSignalStats() {
@@ -525,6 +508,7 @@ function renderSignalDetail(sig = {}) {
 function detailRow(label, value, cls = '') { return `<div class="detail-row"><span>${label}</span><strong class="${cls}">${safe(value)}</strong></div>`; }
 
 function renderPerformance() {
+  ensurePerformanceLayout();
   const s = dashboardData.summary || {};
   document.getElementById('performanceKpis').innerHTML = [
     kpiCard('🏆', 'Win rate', `${safeNumber(s.win_rate)}%`, '30 ngày gần nhất', false, 'summary.win_rate'),
@@ -533,8 +517,9 @@ function renderPerformance() {
     kpiCard('↘', 'Drawdown tối đa', fmtR(s.max_drawdown_r), '30 ngày gần nhất', true)
   ].join('');
   renderLineChart();
+  renderPerformanceOverviewStats();
   renderWeeklyBars();
-  renderDistribution();
+  renderPerformanceDistribution();
   const pairPerformance = arr(dashboardData.pair_performance);
   document.getElementById('pairPerfBody').innerHTML = pairPerformance.length
     ? pairPerformance.map(p => `<tr><td><strong><span class="coin-icon" style="width:28px;height:28px;font-size:14px;margin-right:8px">${iconFor(p.symbol)}</span>${safe(p.symbol)}</strong></td><td>${safeNumber(p.trades)}</td><td class="num-green">${safeNumber(p.win_rate)}%</td><td class="${safeNumber(p.r) < 0 ? 'num-red' : 'num-green'}">${fmtR(p.r)}</td></tr>`).join('')
@@ -544,6 +529,29 @@ function renderPerformance() {
     ${insight('🏆', 'Cặp tốt nhất', safe(best.symbol, 'ETHUSDT'), 'Tổng R', fmtR(best.r))}
     ${insight('🕘', 'Khung hiệu quả', 'M5', 'Win rate', '61.3%')}
     ${insight('↗', 'Chuỗi thắng dài nhất', '5', 'Tín hiệu', '(17/04 – 21/04)')}`;
+}
+
+function ensurePerformanceLayout() {
+  const lineChart = document.getElementById('lineChart');
+  lineChart?.classList.add('performance-overview-chart');
+  lineChart?.closest('.panel')?.classList.add('performance-overview-panel');
+  if (lineChart && !document.getElementById('performanceOverviewStats')) {
+    const stats = document.createElement('div');
+    stats.id = 'performanceOverviewStats';
+    stats.className = 'home-metric-strip performance-overview-stats';
+    lineChart.insertAdjacentElement('afterend', stats);
+  }
+}
+
+function renderPerformanceOverviewStats() {
+  const s = dashboardData.summary || {};
+  const target = document.getElementById('performanceOverviewStats');
+  if (!target) return;
+  target.innerHTML = [
+    homeMetric('Tổng PnL', fmtR(s.total_r), safeNumber(s.total_r) < 0 ? 'num-red' : 'num-green'),
+    homeMetric('Win rate', `${safeNumber(s.win_rate)}%`, 'num-green'),
+    homeMetric('Số lệnh', safeNumber(s.total_signals), 'num-cyan')
+  ].join('');
 }
 
 function insight(icon, label, value, rightLabel, rightValue) {

@@ -900,6 +900,10 @@ body.data-refreshing .live-badge {
   height: 220px;
 }
 
+.performance-overview-chart {
+  height: 220px;
+}
+
 .home-metric-strip {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1006,6 +1010,20 @@ body.data-refreshing .live-badge {
   font-size: 12px;
   text-align: right;
   white-space: nowrap;
+}
+
+.distribution-total-line {
+  width: 100%;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, .08);
+  color: #c8d2d1;
+  font-size: 13px;
+  text-align: center;
+}
+
+.distribution-total-line strong {
+  color: var(--green);
+  font-weight: 900;
 }
 
 .home-signal-stats {
