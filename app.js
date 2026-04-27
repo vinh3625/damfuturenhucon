@@ -206,6 +206,58 @@ function freshnessText(value) {
   return safe(value);
 }
 
+function ensureSystemTab() {
+  const tabs = document.querySelector('.tabs');
+  if (tabs && !document.querySelector('.tab[data-tab="system"]')) {
+    tabs.insertAdjacentHTML('beforeend', '<button class="tab" data-tab="system">Hệ thống</button>');
+  }
+
+  const app = document.querySelector('.app');
+  if (app && !document.getElementById('tab-system')) {
+    app.insertAdjacentHTML('beforeend', `
+      <section id="tab-system" class="tab-panel system-tab">
+        <div class="kpi-grid system-kpi-grid" id="systemKpis"></div>
+
+        <section class="panel system-scan-panel">
+          <div class="panel-title">⟳ Nhịp quét tín hiệu</div>
+          <div class="table-wrap">
+            <table class="system-scan-table">
+              <thead><tr><th>Khung</th><th>Vai trò</th><th>Lần quét cuối</th><th>Lần tới</th><th>Trạng thái</th></tr></thead>
+              <tbody id="systemScanBody"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <div class="system-two-col">
+          <section class="panel">
+            <div class="panel-title">▣ Dữ liệu thị trường</div>
+            <div class="system-list" id="marketDataStatus"></div>
+          </section>
+          <section class="panel">
+            <div class="panel-title">↔ Lệnh &amp; vị thế</div>
+            <div class="system-list" id="positionsStatus"></div>
+          </section>
+        </div>
+
+        <div class="system-two-col">
+          <section class="panel">
+            <div class="panel-title">⚙ Vận hành bot</div>
+            <div class="system-list" id="botOpsStatus"></div>
+          </section>
+          <section class="panel">
+            <div class="panel-title">⚠ Lỗi gần nhất</div>
+            <div id="lastErrorStatus" class="system-error-box"></div>
+          </section>
+        </div>
+
+        <section class="panel system-log-panel">
+          <div class="panel-title">🧾 Nhật ký hệ thống gần đây</div>
+          <div class="system-log-list" id="recentSystemLogs"></div>
+        </section>
+      </section>`);
+  }
+}
+
 function renderHome() {
   ensureHomeLayout();
   const s = dashboardData.summary || {};
@@ -615,7 +667,7 @@ function renderDistribution(targetId = 'distribution') {
 
 function renderLogs() {
   renderActivityLogs();
-  renderSystemSummary();
+  hideLogSystemSummary();
   const d = dashboardData.daily_events || {};
   document.getElementById('dailyHighlights').innerHTML = `<div class="panel-title">☆ Sự kiện nổi bật hôm nay</div>${eventCard('＋','Tín hiệu được tạo',d.signals_created)}${eventCard('↪','Lệnh đã vào',d.entries_executed)}${eventCard('◎','TP hit',d.tp_hit)}${eventCard('✕','SL hit',d.sl_hit, true)}`;
 }
@@ -629,6 +681,129 @@ function renderSystemSummary() {
     ${systemRow('Trạng thái dữ liệu', sys.data_status, false)}${systemRow('Lỗi gần nhất', sys.last_error, false)}${systemRow('Quét M5 cuối', sys.last_m5_scan, false, 'num-cyan')}${systemRow('Vị thế active', sys.active_positions, false)}`;
 }
 function systemRow(label, value, danger=false, cls='num-green') { return `<div class="system-row"><span>${label}</span><strong class="${danger?'num-red':cls}">${safe(value)}</strong></div>`; }
+
+function hideLogSystemSummary() {
+  const panel = document.getElementById('systemSummary');
+  if (!panel) return;
+  panel.classList.add('logs-system-summary-hidden');
+  panel.innerHTML = '';
+}
+
+function displayBool(value, fallback = '--') {
+  if (value === true) return 'Bật';
+  if (value === false) return 'Tắt';
+  return safe(value, fallback);
+}
+
+function displayNormalBool(value) {
+  if (value === true) return 'Có';
+  if (value === false) return 'Không';
+  return safe(value, '--');
+}
+
+function displayList(value) {
+  if (Array.isArray(value)) return value.length ? value.join(', ') : '--';
+  return safe(value);
+}
+
+function shortErrorText(value) {
+  const text = safeStatus(value).trim();
+  if (!text) return '';
+  return text.split('\n')[0].replace(/\s{2,}/g, ' ').slice(0, 180);
+}
+
+function systemScanRows() {
+  const sys = dashboardData.system || {};
+  const source = sys.scan_timeframes;
+  const fallbackRows = [
+    { timeframe: 'M5', role: 'Intraday', last_scan: sys.last_m5_scan, next_scan: '--', status: sys.scan_status || 'Chờ nến đóng' },
+    { timeframe: 'M15', role: 'Swing', last_scan: '--', next_scan: '--', status: sys.scan_status || 'Chờ nến đóng' },
+    { timeframe: 'H1', role: 'Position', last_scan: '--', next_scan: '--', status: sys.scan_status || 'Chờ nến đóng' }
+  ];
+
+  const rows = Array.isArray(source)
+    ? source
+    : source && typeof source === 'object'
+      ? Object.entries(source).map(([timeframe, value]) => ({ timeframe, ...(typeof value === 'object' ? value : { status: value }) }))
+      : fallbackRows;
+
+  const cleanedRows = rows
+    .map(row => ({
+      timeframe: safe(row.timeframe || row.tf || row.frame || row.name || row.label, '').toUpperCase(),
+      role: safe(row.role || row.description),
+      last_scan: safe(row.last_scan || row.lastScan || row.last || row.last_at),
+      next_scan: safe(row.next_scan || row.nextScan || row.next || row.next_at),
+      status: safe(row.status || sys.scan_status, 'Chờ nến đóng')
+    }))
+    .filter(row => row.timeframe && row.timeframe !== 'M1');
+
+  return cleanedRows.length ? cleanedRows : fallbackRows;
+}
+
+function systemListRow(label, value, cls = '') {
+  return `<div class="system-list-row"><span>${label}</span><strong class="${cls}">${safe(value)}</strong></div>`;
+}
+
+function renderSystemTab() {
+  const sys = dashboardData.system || {};
+  const summary = dashboardData.summary || {};
+  const bot = dashboardData.bot || {};
+
+  const botStatus = safe(sys.bot_status_text || bot.status_text, 'Đang hoạt động');
+  const scanStatus = safe(sys.scan_status, 'Chờ nến đóng');
+  const riskLock = sys.risk_lock ? 'Bật' : 'Tắt';
+  const activePositions = safeNumber(sys.active_positions);
+
+  document.getElementById('systemKpis').innerHTML = [
+    kpiCard('●', 'Bot trạng thái', botStatus, 'trạng thái vận hành', false),
+    kpiCard('⟳', 'Scan status', scanStatus, 'nhịp quét tín hiệu', false),
+    kpiCard('🛡', 'Risk lock', riskLock, 'kiểm soát rủi ro', !!sys.risk_lock),
+    kpiCard('↔', 'Vị thế active', activePositions, 'đang theo dõi', false)
+  ].join('');
+
+  document.getElementById('systemScanBody').innerHTML = systemScanRows().map(row => `<tr>
+    <td><strong>${safe(row.timeframe)}</strong></td>
+    <td>${safe(row.role)}</td>
+    <td class="num-cyan">${safe(row.last_scan)}</td>
+    <td>${safe(row.next_scan)}</td>
+    <td><span class="badge info">${safe(row.status, 'Chờ nến đóng')}</span></td>
+  </tr>`).join('');
+
+  document.getElementById('marketDataStatus').innerHTML = [
+    systemListRow('Watchlist', displayList(sys.watchlist_public)),
+    systemListRow('Data status', safe(sys.data_status, 'Bình thường'), 'num-green'),
+    systemListRow('Cache', safe(sys.cache_status)),
+    systemListRow('Stale data', displayNormalBool(sys.stale_data), sys.stale_data ? 'num-red' : 'num-green'),
+    systemListRow('Đồng bộ dashboard', safe(sys.dashboard_sync, 'Bình thường'), 'num-green')
+  ].join('');
+
+  document.getElementById('positionsStatus').innerHTML = [
+    systemListRow('Active positions', safeNumber(sys.active_positions)),
+    systemListRow('Active signals', safeNumber(sys.active_signals, safeNumber(summary.active_signals))),
+    systemListRow('Pending signals', safeNumber(sys.pending_signals, safeNumber(summary.pending_signals))),
+    systemListRow('Closed hôm nay', safeNumber(sys.closed_today)),
+    systemListRow('Daily loss count', safeNumber(sys.daily_loss_count))
+  ].join('');
+
+  document.getElementById('botOpsStatus').innerHTML = [
+    systemListRow('Execution mode', safe(sys.execution_mode_public)),
+    systemListRow('Send group calls', displayBool(sys.send_group_calls)),
+    systemListRow('Send admin reports', displayBool(sys.send_admin_reports)),
+    systemListRow('Lần reset gần nhất', safe(sys.last_reset_at))
+  ].join('');
+
+  const errorText = shortErrorText(sys.last_error);
+  document.getElementById('lastErrorStatus').innerHTML = errorText
+    ? `<strong class="num-red">${errorText}</strong>`
+    : '<strong class="num-green">Không có lỗi gần đây</strong><span>Hệ thống đang hoạt động ổn định</span>';
+
+  const recentLogs = arr(sys.recent_system_logs).length
+    ? arr(sys.recent_system_logs)
+    : arr(dashboardData.activity_logs).filter(log => ['SYSTEM', 'Hệ thống', 'Trạng thái'].includes(safeStatus(log.type)));
+  document.getElementById('recentSystemLogs').innerHTML = recentLogs.length
+    ? recentLogs.slice(0, 8).map(log => `<div class="system-log-row"><span class="timeline-time">${safe(log.time || log.created_at)}</span><span>${highlightMessage(log.message || log.event || log.text)}</span></div>`).join('')
+    : '<div class="empty-state">Chưa có nhật ký hệ thống.</div>';
+}
 
 function renderActivityLogs() {
   const search = (document.getElementById('logSearch')?.value || '').toLowerCase();
@@ -689,12 +864,14 @@ function bindEvents() {
 }
 
 function renderAll() {
+  ensureSystemTab();
   bindEvents();
   renderHeader();
   renderHome();
   renderSignals();
   renderPerformance();
   renderLogs();
+  renderSystemTab();
 }
 
 ensureFavicon();
