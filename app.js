@@ -426,6 +426,8 @@ function renderSystemMini(id) {
 
 function renderSignals() {
   const s = dashboardData.summary || {};
+  const signalsDescription = document.querySelector('#tab-signals .page-head p');
+  if (signalsDescription) signalsDescription.textContent = 'Theo dõi tín hiệu giao dịch theo thời gian thực.';
   document.getElementById('signalsKpis').innerHTML = [
     miniKpi('Tổng hôm nay', safeNumber(s.today_signals)), miniKpi('Đang active', safeNumber(s.active_signals)), miniKpi('Chờ xác nhận', safeNumber(s.pending_signals)), miniKpi('Đã đóng', safeNumber(s.closed_signals))
   ].join('');
@@ -463,7 +465,7 @@ function renderSignalTable() {
   const rows = hasPublicSignals ? getFilteredSignals() : [];
   if (selectedSignalIndex >= rows.length) selectedSignalIndex = 0;
   if (!rows.length) {
-    document.getElementById('signalsBody').innerHTML = '<tr><td colspan="8" class="empty-state">Chưa có tín hiệu public</td></tr>';
+    document.getElementById('signalsBody').innerHTML = '<tr><td colspan="8" class="empty-state">Chưa có tín hiệu</td></tr>';
     document.getElementById('signalCountText').textContent = 'Hiển thị 0 tín hiệu';
     renderSignalDetail(signalList()[0] || {});
     return;
@@ -624,7 +626,7 @@ function renderSystemSummary() {
   const sys = dashboardData.system || {};
   document.getElementById('systemSummary').innerHTML = `<div class="panel-title">〽 Tóm tắt trạng thái</div>
     ${systemRow('Risk lock hôm nay', sys.risk_lock ? 'Bật' : 'Tắt', sys.risk_lock)}
-    ${systemRow('Trạng thái dữ liệu', sys.data_status, false)}${systemRow('Lỗi gần nhất', sys.last_error, false)}${systemRow('Quét M1 cuối', sys.last_m1_scan, false, 'num-cyan')}${systemRow('Quét M5 cuối', sys.last_m5_scan, false, 'num-cyan')}${systemRow('Vị thế active', sys.active_positions, false)}`;
+    ${systemRow('Trạng thái dữ liệu', sys.data_status, false)}${systemRow('Lỗi gần nhất', sys.last_error, false)}${systemRow('Quét M5 cuối', sys.last_m5_scan, false, 'num-cyan')}${systemRow('Vị thế active', sys.active_positions, false)}`;
 }
 function systemRow(label, value, danger=false, cls='num-green') { return `<div class="system-row"><span>${label}</span><strong class="${danger?'num-red':cls}">${safe(value)}</strong></div>`; }
 
