@@ -191,13 +191,14 @@ label { color: #b5c1c4; display: flex; align-items: center; gap: 8px; }
 .log-table-head { display:grid; grid-template-columns: 120px 150px 1fr; gap: 20px; padding: 0 12px 13px; color:#c8d2d5; border-bottom: 1px solid rgba(255,255,255,.12); }
 .log-table .timeline-row { grid-template-columns: 120px 150px 1fr; padding: 10px 12px; }
 .log-type { font-weight: 850; }
-.trade-journal-panel { min-width: 0; margin-bottom: 16px; }
+.trade-journal-panel { min-width: 0; margin-bottom: 0; }
 .journal-card-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 14px;
+  margin-bottom: 12px;
+  min-width: 0;
 }
 .journal-card-head .panel-title {
   margin-bottom: 0;
@@ -216,7 +217,8 @@ label { color: #b5c1c4; display: flex; align-items: center; gap: 8px; }
   display: grid;
   grid-template-columns: repeat(8, minmax(0, 1fr));
   gap: 10px;
-  margin-bottom: 14px;
+  margin-bottom: 16px;
+  min-width: 0;
 }
 .journal-stat-card {
   min-width: 0;

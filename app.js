@@ -267,22 +267,22 @@ function ensureTradeJournalLayout() {
   if (document.getElementById('tradeJournalBody') && document.getElementById('journalQuickStats')) return;
 
   logs.innerHTML = `
-    <section class="panel trade-journal-panel">
-      <div class="journal-card-head">
-        <div class="panel-title">Nhật ký giao dịch</div>
-        <div class="journal-filter" aria-label="Lọc nhật ký giao dịch">
-          ${[
-            ['all', 'Tất cả'],
-            ['running', 'Đang chạy'],
-            ['closed', 'Đã đóng'],
-            ['tp', 'TP'],
-            ['sl', 'SL'],
-            ['long', 'LONG'],
-            ['short', 'SHORT']
-          ].map(([value, label], index) => `<button class="log-pill journal-pill ${index === 0 ? 'active' : ''}" data-journal="${value}">${label}</button>`).join('')}
-        </div>
+    <div class="journal-card-head">
+      <div class="panel-title">Nhật ký giao dịch</div>
+      <div class="journal-filter" aria-label="Lọc nhật ký giao dịch">
+        ${[
+          ['all', 'Tất cả'],
+          ['running', 'Đang chạy'],
+          ['closed', 'Đã đóng'],
+          ['tp', 'TP'],
+          ['sl', 'SL'],
+          ['long', 'LONG'],
+          ['short', 'SHORT']
+        ].map(([value, label], index) => `<button class="log-pill journal-pill ${index === 0 ? 'active' : ''}" data-journal="${value}">${label}</button>`).join('')}
       </div>
-      <div class="journal-stats-grid" id="journalQuickStats"></div>
+    </div>
+    <div class="journal-stats-grid" id="journalQuickStats"></div>
+    <section class="panel trade-journal-panel">
       <div class="table-wrap trade-journal-wrap">
         <table class="trade-journal-table">
           <thead><tr><th>Thời gian</th><th>Cặp</th><th>Hướng</th><th>Khung</th><th>Entry</th><th>SL</th><th>TP1</th><th>TP2</th><th>Giá trị lệnh</th><th>Trạng thái</th><th>Kết quả</th></tr></thead>
