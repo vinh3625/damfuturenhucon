@@ -187,9 +187,9 @@ function renderHeader() {
   const bot = dashboardData.bot || {};
   document.title = DISPLAY_BRAND_NAME;
   document.querySelector('h1').textContent = DISPLAY_BRAND_NAME;
-  document.getElementById('botStatusText').textContent = safe(bot.status_text);
+  document.getElementById('botStatusText').textContent = 'Online';
   const updatedAt = dashboardData.cloudflare_published_at || bot.updated_at;
-  document.getElementById('updatedAt').innerHTML = `<span class="live-badge">Live</span> ${freshnessText(updatedAt)}`;
+  document.getElementById('updatedAt').textContent = freshnessText(updatedAt);
 }
 
 function freshnessText(value) {
