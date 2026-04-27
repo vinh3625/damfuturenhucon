@@ -1,4 +1,5 @@
 let dashboardData = null;
+let rawDashboardData = null;
 let activeSignalFilter = 'all';
 let selectedSignalIndex = 0;
 let activeLogFilter = 'all';
@@ -23,10 +24,17 @@ const LEGACY_DASHBOARD_API_URL = 'https://bingx-dashboard-api.nguyenvanvinh03062
 const LOCAL_FALLBACK_URL = 'public_dashboard.json';
 const DEMO_DASHBOARD_URL = 'public_dashboard.demo.json';
 const DISPLAY_BRAND_NAME = '@damfuturenhucon';
+const DASHBOARD_TIMEZONE = "Asia/Ho_Chi_Minh";
 const FALLBACK_POLL_MS = 5000;
 const RECONNECT_DELAYS_MS = [1000, 2000, 3000, 5000, 10000];
+const TIME_RANGE_STORAGE_KEY = 'dashboard_time_range';
+const DEFAULT_TIME_RANGE = '30D';
+const TIME_RANGE_OPTIONS = ['1D', '7D', '30D', '90D', 'ALL'];
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+const VIETNAM_UTC_OFFSET_MS = 7 * 60 * 60 * 1000;
 const isDemoMode = new URLSearchParams(window.location.search).get('demo') === '1'
   && ['localhost', '127.0.0.1'].includes(window.location.hostname);
+let selectedTimeRange = readStoredTimeRange();
 
 const coinIconMap = {
   BTC: '₿', ETH: '◆', SOL: '≋', BNB: '◇', XRP: '✕', DOGE: 'Ð', ADA: '●', AVAX: '▲', MATIC: '⬡', LINK: '⬢'
@@ -118,6 +126,359 @@ function ensureFavicon() {
   document.head.appendChild(icon);
 }
 
+function readStoredTimeRange() {
+  try {
+    const stored = window.localStorage.getItem(TIME_RANGE_STORAGE_KEY);
+    return TIME_RANGE_OPTIONS.includes(stored) ? stored : DEFAULT_TIME_RANGE;
+  } catch (error) {
+    return DEFAULT_TIME_RANGE;
+  }
+}
+
+function saveSelectedTimeRange() {
+  try {
+    window.localStorage.setItem(TIME_RANGE_STORAGE_KEY, selectedTimeRange);
+  } catch (error) {
+    console.warn('[dashboard] Could not save selected time range', error);
+  }
+}
+
+function getVietnamNow() {
+  return new Date();
+}
+
+function getVietnamDateParts(date = getVietnamNow()) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: DASHBOARD_TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hourCycle: 'h23'
+  }).formatToParts(date);
+  const read = type => Number(parts.find(part => part.type === type)?.value || 0);
+  return {
+    year: read('year'),
+    month: read('month'),
+    day: read('day'),
+    hour: read('hour'),
+    minute: read('minute'),
+    second: read('second')
+  };
+}
+
+function createVietnamDate(year, month, day, hour = 0, minute = 0, second = 0) {
+  return new Date(Date.UTC(year, month - 1, day, hour, minute, second) - VIETNAM_UTC_OFFSET_MS);
+}
+
+function getVietnamStartOfToday(date = getVietnamNow()) {
+  const parts = getVietnamDateParts(date);
+  return createVietnamDate(parts.year, parts.month, parts.day);
+}
+
+function getRangeStartDate(range) {
+  if (range === 'ALL') return null;
+  const daysBack = { '1D': 0, '7D': 6, '30D': 29, '90D': 89 }[range];
+  if (daysBack === undefined) return null;
+  return new Date(getVietnamStartOfToday().getTime() - daysBack * MS_PER_DAY);
+}
+
+function getRangeBounds(range) {
+  if (range === 'ALL') return { start: null, end: null };
+  return {
+    start: getRangeStartDate(range),
+    end: getVietnamNow()
+  };
+}
+
+function getRangeLabel(range = selectedTimeRange) {
+  return {
+    '1D': 'Hôm nay',
+    '7D': '7 ngày gần nhất',
+    '30D': '30 ngày gần nhất',
+    '90D': '90 ngày gần nhất',
+    ALL: 'Toàn bộ dữ liệu'
+  }[range] || '30 ngày gần nhất';
+}
+
+function getPerformanceTitle(range = selectedTimeRange) {
+  return {
+    '1D': 'Hiệu suất hôm nay',
+    '7D': 'Hiệu suất 7 ngày',
+    '30D': 'Hiệu suất 30 ngày',
+    '90D': 'Hiệu suất 90 ngày',
+    ALL: 'Hiệu suất toàn thời gian'
+  }[range] || 'Hiệu suất 30 ngày';
+}
+
+function getResultPeriodTitle(range = selectedTimeRange) {
+  return {
+    '1D': 'Kết quả hôm nay',
+    '7D': 'Kết quả 7 ngày',
+    '30D': 'Kết quả theo tuần',
+    '90D': 'Kết quả theo tuần',
+    ALL: 'Kết quả theo tuần'
+  }[range] || 'Kết quả theo tuần';
+}
+
+function parseDashboardTime(value, item = {}) {
+  if (value === undefined || value === null || value === '') return null;
+
+  if (typeof value === 'number' || /^\d{10,13}$/.test(String(value).trim())) {
+    const numeric = Number(value);
+    if (Number.isFinite(numeric)) {
+      const time = numeric < 1e12 ? numeric * 1000 : numeric;
+      return Number.isNaN(time) ? null : time;
+    }
+  }
+
+  const raw = safeStatus(value).trim();
+  if (!raw || raw === '--') return null;
+
+  let match = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
+  if (match) {
+    return createVietnamDate(
+      Number(match[3]),
+      Number(match[2]),
+      Number(match[1]),
+      Number(match[4] || 0),
+      Number(match[5] || 0),
+      Number(match[6] || 0)
+    ).getTime();
+  }
+
+  match = raw.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T\s](\d{1,2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?)?$/);
+  if (match) {
+    return createVietnamDate(
+      Number(match[1]),
+      Number(match[2]),
+      Number(match[3]),
+      Number(match[4] || 0),
+      Number(match[5] || 0),
+      Number(match[6] || 0)
+    ).getTime();
+  }
+
+  match = raw.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+  if (match && item.date) {
+    return parseDashboardTime(`${item.date} ${raw}`);
+  }
+
+  const parsed = Date.parse(raw);
+  if (!Number.isNaN(parsed)) return parsed;
+
+  return null;
+}
+
+function parseDashboardTimestamp(value, item = {}) {
+  return parseDashboardTime(value, item);
+}
+
+function formatDateVN(value) {
+  const time = parseDashboardTime(value);
+  if (time === null) return safe(value);
+  const parts = getVietnamDateParts(new Date(time));
+  return `${String(parts.day).padStart(2, '0')}/${String(parts.month).padStart(2, '0')}/${parts.year}`;
+}
+
+function formatDateTimeVN(value) {
+  const time = parseDashboardTime(value);
+  if (time === null) return safe(value);
+  const parts = getVietnamDateParts(new Date(time));
+  return `${String(parts.day).padStart(2, '0')}/${String(parts.month).padStart(2, '0')}/${parts.year} ${String(parts.hour).padStart(2, '0')}:${String(parts.minute).padStart(2, '0')}`;
+}
+
+function formatItemDateTimeVN(item = {}) {
+  const fields = ['created_at_iso', 'opened_at_iso', 'closed_at_iso', 'time_iso', 'timestamp', 'updated_at', 'created_at', 'time', 'date', 'display_time'];
+  for (const field of fields) {
+    const time = parseDashboardTime(item[field], item);
+    if (time !== null) return formatDateTimeVN(time);
+  }
+  return '--';
+}
+
+function getItemTimestamp(item = {}) {
+  const fields = [
+    'created_at_iso',
+    'opened_at_iso',
+    'closed_at_iso',
+    'time_iso',
+    'timestamp',
+    'updated_at',
+    'created_at',
+    'time',
+    'date',
+    'display_time'
+  ];
+
+  for (const field of fields) {
+    const time = parseDashboardTime(item[field], item);
+    if (time !== null) return time;
+  }
+
+  return null;
+}
+
+function getDatedItemTimestamp(item = {}) {
+  const directTime = getItemTimestamp(item);
+  if (directTime !== null) return directTime;
+
+  const datedFields = ['date', 'range_end', 'end_date', 'range_start', 'start_date'];
+  for (const field of datedFields) {
+    const time = parseDashboardTime(item[field], item);
+    if (time !== null) return time;
+  }
+
+  const rangeMatch = safeStatus(item.range).match(/(\d{4}-\d{2}-\d{2})\s+-\s+(\d{4}-\d{2}-\d{2})/);
+  return rangeMatch ? parseDashboardTime(rangeMatch[2]) : null;
+}
+
+function isWithinSelectedRange(item, range = selectedTimeRange, timestampReader = getItemTimestamp) {
+  if (range === 'ALL') return true;
+  const bounds = getRangeBounds(range);
+  if (!bounds.start || !bounds.end) return true;
+  const time = timestampReader(item);
+  if (time === null) return false;
+  return time >= bounds.start.getTime() && time <= bounds.end.getTime();
+}
+
+function filterHistoricalRows(rows, range = selectedTimeRange, timestampReader = getItemTimestamp) {
+  return arr(rows).filter(row => isWithinSelectedRange(row, range, timestampReader));
+}
+
+function isPendingHistoryRow(row = {}) {
+  const status = safeStatus(row.status).toLowerCase();
+  return status.includes('chờ') || status.includes('pending');
+}
+
+function isClosedHistoryRow(row = {}) {
+  const status = safeStatus(row.status).toLowerCase();
+  const result = safeStatus(row.result || row.outcome || row.pnl_result);
+  return status.includes('đã đóng') || status.includes('closed') || Boolean(normalizeDistributionOutcome(result));
+}
+
+function normalizeDistributionOutcome(value) {
+  const text = safeStatus(value).toUpperCase();
+  if (/\bTP1\b/.test(text)) return 'TP1';
+  if (/\bTP2\b/.test(text)) return 'TP2';
+  if (/\bSL\b/.test(text) || text.includes('STOP LOSS')) return 'SL';
+  if (text.includes('THOÁT') || text.includes('EARLY')) return 'Thoát sớm';
+  return '';
+}
+
+function resultRowsForStats(tradeJournal, recentResults) {
+  const journalRows = arr(tradeJournal).filter(row => isClosedHistoryRow(row) || row.r !== undefined);
+  if (journalRows.length) return journalRows;
+  return arr(recentResults).filter(row => normalizeDistributionOutcome(row.result || row.status || row.label) || row.r !== undefined);
+}
+
+function sumResultR(rows) {
+  return arr(rows).reduce((sum, row) => {
+    const value = Number(firstValue(row.r, row.rr, row.r_multiple, row.result_r, row.pnl_r));
+    return Number.isFinite(value) ? sum + value : sum;
+  }, 0);
+}
+
+function recomputeSummary(source = {}, filtered = {}) {
+  const base = source.summary || {};
+  const activeTradesCount = arr(source.active_trades).length || safeNumber(base.active_trades);
+  const historyRows = arr(filtered.trade_journal).length ? arr(filtered.trade_journal) : arr(filtered.signals);
+  const resultRows = resultRowsForStats(filtered.trade_journal, filtered.recent_results);
+  const resolvedRows = resultRows.filter(row => ['TP1', 'TP2', 'SL'].includes(normalizeDistributionOutcome(row.result || row.status || row.label)));
+  const wins = resolvedRows.filter(row => ['TP1', 'TP2'].includes(normalizeDistributionOutcome(row.result || row.status || row.label))).length;
+  const totalR = sumResultR(resultRows);
+  const totalSignals = historyRows.length || arr(filtered.signals).length || arr(filtered.recent_results).length;
+
+  return {
+    ...base,
+    total_signals: totalSignals,
+    win_rate: resolvedRows.length ? Number(((wins / resolvedRows.length) * 100).toFixed(1)) : 0,
+    total_r: Number(totalR.toFixed(2)),
+    active_trades: activeTradesCount,
+    active_signals: activeTradesCount,
+    pending_signals: historyRows.filter(isPendingHistoryRow).length,
+    closed_signals: historyRows.filter(isClosedHistoryRow).length
+  };
+}
+
+function recomputeResultDistribution(tradeJournal, recentResults, fallback = []) {
+  const resultRows = resultRowsForStats(tradeJournal, recentResults);
+  if (!resultRows.length && !arr(tradeJournal).length && !arr(recentResults).length) return arr(fallback);
+
+  const counts = { SL: 0, TP1: 0, TP2: 0, 'Thoát sớm': 0 };
+  resultRows.forEach(row => {
+    const outcome = normalizeDistributionOutcome(row.result || row.status || row.label);
+    if (outcome && counts[outcome] !== undefined) counts[outcome] += 1;
+  });
+
+  const total = Object.values(counts).reduce((sum, count) => sum + count, 0);
+  return Object.entries(counts).map(([label, count]) => ({
+    label,
+    count,
+    percent: total ? Number(((count / total) * 100).toFixed(1)) : 0
+  }));
+}
+
+function recomputePairPerformance(tradeJournal, fallback = []) {
+  const rows = arr(tradeJournal).filter(row => row.symbol && (isClosedHistoryRow(row) || row.r !== undefined));
+  if (!arr(tradeJournal).length) return arr(fallback);
+
+  const groups = new Map();
+  rows.forEach(row => {
+    const symbol = safeStatus(row.symbol).toUpperCase();
+    if (!symbol) return;
+    if (!groups.has(symbol)) groups.set(symbol, []);
+    groups.get(symbol).push(row);
+  });
+
+  return Array.from(groups.entries())
+    .map(([symbol, symbolRows]) => {
+      const resolvedRows = symbolRows.filter(row => ['TP1', 'TP2', 'SL'].includes(normalizeDistributionOutcome(row.result || row.status || row.label)));
+      const wins = resolvedRows.filter(row => ['TP1', 'TP2'].includes(normalizeDistributionOutcome(row.result || row.status || row.label))).length;
+      const r = sumResultR(symbolRows);
+      return {
+        symbol,
+        trades: symbolRows.length,
+        win_rate: resolvedRows.length ? Number(((wins / resolvedRows.length) * 100).toFixed(1)) : 0,
+        r: Number(r.toFixed(2))
+      };
+    })
+    .sort((a, b) => safeNumber(b.r) - safeNumber(a.r));
+}
+
+function createFilteredDashboardData(source = {}) {
+  if (!source || typeof source !== 'object') return source;
+
+  const filtered = {
+    ...source,
+    signals: filterHistoricalRows(source.signals),
+    trade_journal: filterHistoricalRows(source.trade_journal),
+    recent_results: filterHistoricalRows(source.recent_results),
+    activity_logs: filterHistoricalRows(source.activity_logs),
+    performance_30d: filterHistoricalRows(source.performance_30d, selectedTimeRange, getDatedItemTimestamp),
+    weekly_results: filterHistoricalRows(source.weekly_results, selectedTimeRange, getDatedItemTimestamp)
+  };
+
+  filtered.summary = recomputeSummary(source, filtered);
+  filtered.result_distribution = recomputeResultDistribution(filtered.trade_journal, filtered.recent_results, source.result_distribution);
+  filtered.pair_performance = recomputePairPerformance(filtered.trade_journal, source.pair_performance);
+  return filtered;
+}
+
+function applyGlobalTimeRange() {
+  if (!rawDashboardData) return;
+  const nextData = createFilteredDashboardData(rawDashboardData);
+  const nextSnapshot = createMetricSnapshot(nextData);
+  changedMetrics = previousMetricSnapshot
+    ? new Set(Object.keys(nextSnapshot).filter(key => nextSnapshot[key] !== previousMetricSnapshot[key]))
+    : new Set();
+  previousMetricSnapshot = nextSnapshot;
+  dashboardData = nextData;
+  currentData = nextData;
+}
+
 async function fetchDashboardJson(url, label) {
   const res = await fetch(url, { cache: 'no-store' });
   if (!res.ok) throw new Error(`${label} fetch failed: ${res.status}`);
@@ -153,14 +514,9 @@ function createMetricSnapshot(data) {
   return Object.fromEntries(Object.entries(trackedMetrics).map(([key, read]) => [key, read(data)]));
 }
 
-function setDashboardData(nextData) {
-  const nextSnapshot = createMetricSnapshot(nextData);
-  changedMetrics = previousMetricSnapshot
-    ? new Set(Object.keys(nextSnapshot).filter(key => nextSnapshot[key] !== previousMetricSnapshot[key]))
-    : new Set();
-  previousMetricSnapshot = nextSnapshot;
-  dashboardData = nextData;
-  currentData = nextData;
+function setDashboardData(nextRawData) {
+  rawDashboardData = nextRawData;
+  applyGlobalTimeRange();
   lastDataReceivedAt = new Date().toISOString();
 }
 
@@ -317,6 +673,35 @@ function startRealtimeUpdates() {
   startFallbackPolling();
 }
 
+function ensureHeaderRangeFilter() {
+  const statusBox = document.querySelector('.status-box');
+  if (!statusBox) return;
+  if (statusBox.querySelector('.header-range-filter')) {
+    updateRangeFilterButtons();
+    return;
+  }
+
+  statusBox.innerHTML = `<div class="header-range-filter" aria-label="Lọc dữ liệu theo thời gian">
+    ${TIME_RANGE_OPTIONS.map(range => `<button type="button" class="range-filter-button" data-range="${range}">${range}</button>`).join('')}
+  </div>`;
+  updateRangeFilterButtons();
+}
+
+function updateRangeFilterButtons() {
+  document.querySelectorAll('.range-filter-button').forEach(button => {
+    button.classList.toggle('active', button.dataset.range === selectedTimeRange);
+  });
+}
+
+function handleTimeRangeChange(range) {
+  if (!TIME_RANGE_OPTIONS.includes(range) || range === selectedTimeRange) return;
+  selectedTimeRange = range;
+  saveSelectedTimeRange();
+  applyGlobalTimeRange();
+  renderAll();
+  markRefreshDone();
+}
+
 function kpiCard(icon, label, value, sub, negative = false, metricKeys = []) {
   const keys = Array.isArray(metricKeys) ? metricKeys : metricKeys ? [metricKeys] : [];
   const changed = keys.some(key => changedMetrics.has(key));
@@ -328,27 +713,10 @@ function kpiCard(icon, label, value, sub, negative = false, metricKeys = []) {
 }
 
 function renderHeader() {
-  const bot = dashboardData.bot || {};
-  const realtime = dashboardData.realtime || {};
   document.title = DISPLAY_BRAND_NAME;
   document.querySelector('h1').textContent = DISPLAY_BRAND_NAME;
-  document.getElementById('botStatusText').textContent = 'Online';
-  const updatedAt = firstValue(realtime.updated_at, bot.updated_at, lastDataReceivedAt, dashboardData.cloudflare_published_at);
-  document.getElementById('updatedAt').textContent = freshnessText(updatedAt);
-}
-
-function freshnessText(value) {
-  const raw = safeStatus(value);
-  const time = Date.parse(raw);
-  if (!raw || Number.isNaN(time)) return safe(value);
-
-  const seconds = Math.max(0, Math.floor((Date.now() - time) / 1000));
-  if (seconds < 60) return `Cập nhật ${seconds} giây trước`;
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `Cập nhật ${minutes} phút trước`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `Cập nhật ${hours} giờ trước`;
-  return safe(value);
+  ensureHeaderRangeFilter();
+  updateRangeFilterButtons();
 }
 
 function ensureSystemTab() {
@@ -438,10 +806,11 @@ function ensureTradeJournalLayout() {
 function renderHome() {
   ensureHomeLayout();
   const s = dashboardData.summary || {};
+  const rangeLabel = getRangeLabel();
   document.getElementById('homeKpis').innerHTML = [
-    kpiCard('📡', 'Tổng tín hiệu', safeNumber(s.total_signals), '30 ngày gần nhất', false, 'summary.total_signals'),
-    kpiCard('🏆', 'Win rate', `${safeNumber(s.win_rate)}%`, '30 ngày gần nhất', false, 'summary.win_rate'),
-    kpiCard('$', 'Tổng lợi nhuận', fmtR(s.total_r), '30 ngày gần nhất', false, 'summary.total_r'),
+    kpiCard('📡', 'Tổng tín hiệu', safeNumber(s.total_signals), rangeLabel, false, 'summary.total_signals'),
+    kpiCard('🏆', 'Win rate', `${safeNumber(s.win_rate)}%`, rangeLabel, false, 'summary.win_rate'),
+    kpiCard('$', 'Tổng lợi nhuận', fmtR(s.total_r), rangeLabel, false, 'summary.total_r'),
     kpiCard('〽', 'Lệnh đang chạy', safeNumber(s.active_trades), 'cập nhật realtime', false, ['summary.active_trades', 'active_trades.count'])
   ].join('');
 
@@ -463,7 +832,7 @@ function renderHome() {
       ${field('Trạng thái', `<span class="badge info ${metricChanged('latest_signal.status') ? 'value-updated' : ''}">${latestStatus}</span>`)}
       ${field('R:R', formatRiskReward(l), 'num-cyan')}
       ${field('Độ tự tin', l.confidence, 'num-green')}
-      ${field('Thời gian', l.created_at)}
+      ${field('Thời gian', formatItemDateTimeVN(l))}
     </div>
   </div>`;
 
@@ -585,19 +954,18 @@ function signalDistributionItems() {
 function renderSignalDistribution(targetId, { showTotalLine = false } = {}) {
   const items = signalDistributionItems();
   const distributionTotal = items.reduce((sum, item) => sum + safeNumber(item.count), 0);
-  const totalSignals = readTotalSignals();
 
   const target = document.getElementById(targetId);
   if (!target) return;
   target.classList.add('home-distribution');
   target.innerHTML = `
     <div class="home-donut" style="background:${homeDonutBackground(items)}">
-      <div class="home-donut-inner"><strong>${distributionTotal}</strong><span>Tổng</span></div>
+      <div class="home-donut-inner"><strong>${distributionTotal}</strong><span>Lệnh đóng</span></div>
     </div>
     <div class="home-distribution-legend">
       ${items.map(item => `<div class="home-legend-item"><span class="dot" style="background:${item.color}"></span><span>${item.label}</span><strong class="${item.cls}">${safeNumber(item.count)} (${formatPercent(percentOf(item.count, distributionTotal))})</strong></div>`).join('')}
     </div>
-    ${showTotalLine ? `<div class="distribution-total-line">Tổng tín hiệu: <strong>${totalSignals}</strong></div>` : ''}`;
+    ${showTotalLine ? `<div class="distribution-total-line">Lệnh đóng: <strong>${distributionTotal}</strong></div>` : ''}`;
 }
 
 function renderPerformanceDistribution() {
@@ -661,7 +1029,7 @@ function renderSignals() {
   const signalsDescription = document.querySelector('#tab-signals .page-head p');
   if (signalsDescription) signalsDescription.textContent = 'Theo dõi tín hiệu giao dịch theo thời gian thực.';
   document.getElementById('signalsKpis').innerHTML = [
-    miniKpi('Tổng hôm nay', safeNumber(s.today_signals)), miniKpi('Đang active', safeNumber(s.active_signals)), miniKpi('Chờ xác nhận', safeNumber(s.pending_signals)), miniKpi('Đã đóng', safeNumber(s.closed_signals))
+    miniKpi(`Tổng ${getRangeLabel().toLowerCase()}`, safeNumber(s.total_signals)), miniKpi('Đang active', safeNumber(s.active_signals)), miniKpi('Chờ xác nhận', safeNumber(s.pending_signals)), miniKpi('Đã đóng', safeNumber(s.closed_signals))
   ].join('');
   fillFilters();
   renderSignalTable();
@@ -692,12 +1060,12 @@ function getFilteredSignals() {
 }
 
 function renderSignalTable() {
-  document.querySelector('.signal-table thead').innerHTML = '<tr><th>Cặp</th><th>Hướng</th><th>Khung</th><th>Entry</th><th>SL</th><th>TP1</th><th>TP2</th><th>Trạng thái</th></tr>';
+  document.querySelector('.signal-table thead').innerHTML = '<tr><th>Cặp</th><th>Hướng</th><th>Khung</th><th>Entry</th><th>SL</th><th>TP1</th><th>TP2</th><th>Trạng thái</th><th>Thời gian</th></tr>';
   const hasPublicSignals = arr(dashboardData.signals).length > 0;
   const rows = hasPublicSignals ? getFilteredSignals() : [];
   if (selectedSignalIndex >= rows.length) selectedSignalIndex = 0;
   if (!rows.length) {
-    document.getElementById('signalsBody').innerHTML = '<tr><td colspan="8" class="empty-state">Chưa có tín hiệu</td></tr>';
+    document.getElementById('signalsBody').innerHTML = '<tr><td colspan="9" class="empty-state">Chưa có tín hiệu</td></tr>';
     document.getElementById('signalCountText').textContent = 'Hiển thị 0 tín hiệu';
     renderSignalDetail(signalList()[0] || {});
     return;
@@ -710,6 +1078,7 @@ function renderSignalTable() {
       <td class="${clsDir(sig.direction)}"><strong>${safe(sig.direction, 'LONG')}</strong></td>
       <td>${safe(sig.timeframe)}</td><td>${safe(sig.entry)}</td><td class="num-red">${safe(sig.sl)}</td><td class="num-green">${safe(sig.tp1)}</td><td class="num-green">${safe(sig.tp2)}</td>
       <td><span class="badge ${statusClass(status)}">${status}</span></td>
+      <td class="timeline-time">${formatItemDateTimeVN(sig)}</td>
     </tr>`;
   }).join('');
   document.getElementById('signalCountText').textContent = `Hiển thị 1 - ${rows.length} của ${signalList().length} tín hiệu`;
@@ -729,9 +1098,7 @@ function renderSignalDetail(sig = {}) {
   const symbol = safe(sig.symbol, 'ETHUSDT');
   const direction = safe(sig.direction, 'LONG');
   const status = safe(sig.status, 'Chưa có tín hiệu');
-  const date = safe(sig.date, '');
-  const time = safe(sig.time, '');
-  const timeText = safe([date, time].filter(Boolean).join(' '), safe(sig.created_at));
+  const timeText = formatItemDateTimeVN(sig);
 
   document.getElementById('signalDetail').innerHTML = `<div class="panel-title">◎ Chi tiết tín hiệu</div>
     <div class="signal-symbol" style="margin-bottom:16px"><span class="coin-icon">${iconFor(symbol)}</span><span class="big-symbol">${symbol}</span><span class="badge ${clsDir(direction)}">${direction}</span></div>
@@ -744,11 +1111,12 @@ function detailRow(label, value, cls = '') { return `<div class="detail-row"><sp
 function renderPerformance() {
   ensurePerformanceLayout();
   const s = dashboardData.summary || {};
+  const rangeLabel = getRangeLabel();
   document.getElementById('performanceKpis').innerHTML = [
-    kpiCard('🏆', 'Win rate', `${safeNumber(s.win_rate)}%`, '30 ngày gần nhất', false, 'summary.win_rate'),
-    kpiCard('$', 'Tổng lợi nhuận', fmtR(s.total_r), '30 ngày gần nhất', false, 'summary.total_r'),
-    kpiCard('📡', 'Tổng tín hiệu', safeNumber(s.total_signals), '30 ngày gần nhất', false, 'summary.total_signals'),
-    kpiCard('↘', 'Drawdown tối đa', fmtR(s.max_drawdown_r), '30 ngày gần nhất', true)
+    kpiCard('🏆', 'Win rate', `${safeNumber(s.win_rate)}%`, rangeLabel, false, 'summary.win_rate'),
+    kpiCard('$', 'Tổng lợi nhuận', fmtR(s.total_r), rangeLabel, false, 'summary.total_r'),
+    kpiCard('📡', 'Tổng tín hiệu', safeNumber(s.total_signals), rangeLabel, false, 'summary.total_signals'),
+    kpiCard('↘', 'Drawdown tối đa', fmtR(s.max_drawdown_r), rangeLabel, true)
   ].join('');
   renderLineChart();
   renderPerformanceOverviewStats();
@@ -767,6 +1135,10 @@ function renderPerformance() {
 
 function ensurePerformanceLayout() {
   const lineChart = document.getElementById('lineChart');
+  const lineTitle = lineChart?.closest('.panel')?.querySelector('.panel-title');
+  if (lineTitle) lineTitle.textContent = `↗ ${getPerformanceTitle()}`;
+  const weeklyTitle = document.getElementById('weeklyBars')?.closest('.panel')?.querySelector('.panel-title');
+  if (weeklyTitle) weeklyTitle.textContent = `▮ ${getResultPeriodTitle()}`;
   lineChart?.classList.add('performance-overview-chart');
   lineChart?.closest('.panel')?.classList.add('performance-overview-panel');
   if (lineChart && !document.getElementById('performanceOverviewStats')) {
@@ -818,7 +1190,7 @@ function renderLineChart(targetId = 'lineChart') {
     .join('');
   const labelIndexes = new Set([0, 3, 6, 9, 12, data.length - 1]);
   const labels = data
-    .map((d, i) => labelIndexes.has(i) ? `<text class="axis-label" x="${Math.max(padL - 10, x(i)-18)}" y="${h-10}">${safe(d.date)}</text>` : '')
+    .map((d, i) => labelIndexes.has(i) ? `<text class="axis-label" x="${Math.max(padL - 10, x(i)-18)}" y="${h-10}">${formatDateVN(d.date || d.time || d.created_at)}</text>` : '')
     .join('');
 
   const last = data[data.length - 1];
@@ -829,16 +1201,7 @@ function renderLineChart(targetId = 'lineChart') {
 }
 
 function formatWeekDate(value) {
-  const raw = safeStatus(value).trim();
-  const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (match) return `${match[3]}/${match[2]}/${match[1]}`;
-  const time = Date.parse(raw);
-  if (Number.isNaN(time)) return safe(raw);
-  return new Intl.DateTimeFormat('vi-VN', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric'
-  }).format(new Date(time));
+  return formatDateVN(value);
 }
 
 function weeklyLabelHtml(week = {}) {
@@ -862,14 +1225,14 @@ function renderWeeklyBars() {
       const value = safeNumber(w.r);
       return `<div class="bar-item"><div class="bar-value">${fmtR(value)}</div><div class="bar" style="height:${Math.max(35, (Math.abs(value)/max)*180)}px"></div>${weeklyLabelHtml(w)}</div>`;
     }).join('')
-    : '<div class="empty-state">Chưa có kết quả theo tuần</div>';
+    : `<div class="empty-state">Chưa có ${getResultPeriodTitle().toLowerCase()}</div>`;
 }
 
 function renderDistribution(targetId = 'distribution') {
   const target = document.getElementById(targetId);
   if (!target) return;
-  const total = safeNumber(dashboardData.summary?.total_signals);
-  target.innerHTML = `<div class="donut"><div class="donut-inner"><strong>${total}</strong><br><span>Tín hiệu</span></div></div><div class="legend-list">${arr(dashboardData.result_distribution).map((x,i)=>`<div><span class="dot" style="background:${['var(--green)','var(--cyan)','var(--red)','var(--yellow)'][i]}"></span> ${safe(x.label)} <strong style="float:right">${safeNumber(x.count)} (${safeNumber(x.percent)}%)</strong></div>`).join('')}<small>Tổng: ${total} tín hiệu</small></div>`;
+  const total = arr(dashboardData.result_distribution).reduce((sum, item) => sum + safeNumber(item.count), 0);
+  target.innerHTML = `<div class="donut"><div class="donut-inner"><strong>${total}</strong><br><span>Lệnh đóng</span></div></div><div class="legend-list">${arr(dashboardData.result_distribution).map((x,i)=>`<div><span class="dot" style="background:${['var(--green)','var(--cyan)','var(--red)','var(--yellow)'][i]}"></span> ${safe(x.label)} <strong style="float:right">${safeNumber(x.count)} (${safeNumber(x.percent)}%)</strong></div>`).join('')}<small>Lệnh đóng: ${total}</small></div>`;
 }
 
 function renderLogs() {
@@ -894,7 +1257,7 @@ function journalResultFromStatus(status) {
 function normalizeJournalRow(row = {}, fallback = {}) {
   const status = firstValue(row.status, fallback.status, row.result ? 'Đã đóng' : '');
   return {
-    time: firstValue(row.time, row.created_at, row.created_at_iso, row.opened_at, row.closed_at, row.updated_at, fallback.time),
+    time: firstValue(row.created_at_iso, row.opened_at_iso, row.closed_at_iso, row.time_iso, row.timestamp, row.updated_at, row.created_at, row.time, row.date, row.display_time, fallback.time),
     symbol: firstValue(row.symbol, fallback.symbol),
     direction: safeStatus(firstValue(row.direction, fallback.direction)).toUpperCase(),
     timeframe: firstValue(row.timeframe, row.tf, row.frame, fallback.timeframe),
@@ -1121,25 +1484,13 @@ function shortErrorText(value) {
 }
 
 function formatSystemDateTime(value) {
-  if (value === undefined || value === null) return '--';
-  const raw = safeStatus(value).trim();
-  if (!raw || raw === '--') return '--';
+  return formatDateTimeVN(value);
+}
 
-  const isoMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})[T\s](\d{2}):(\d{2})(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?$/);
-  if (isoMatch) return `${isoMatch[3]}/${isoMatch[2]}/${isoMatch[1]} ${isoMatch[4]}:${isoMatch[5]}`;
-
-  if (typeof value === 'number' || /^\d{10,13}$/.test(raw)) {
-    const numeric = Number(value);
-    if (Number.isFinite(numeric)) {
-      const date = new Date(numeric < 1e12 ? numeric * 1000 : numeric);
-      if (!Number.isNaN(date.getTime())) {
-        const pad = part => String(part).padStart(2, '0');
-        return `${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${date.getFullYear()} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
-      }
-    }
-  }
-
-  return safe(value);
+function formatActivityLogTime(log = {}) {
+  const formatted = formatItemDateTimeVN(log);
+  if (formatted !== '--') return formatted;
+  return safeStatus(log.time).slice(0, 5) || '--';
 }
 
 function systemScanRows() {
@@ -1271,7 +1622,7 @@ function renderSystemTab() {
     ? arr(sys.recent_system_logs)
     : arr(dashboardData.activity_logs).filter(log => ['SYSTEM', 'Hệ thống', 'Trạng thái'].includes(safeStatus(log.type)));
   document.getElementById('recentSystemLogs').innerHTML = recentLogs.length
-    ? recentLogs.slice(0, 8).map(log => `<div class="system-log-row"><span class="timeline-time">${formatSystemDateTime(log.time || log.created_at)}</span><span>${highlightMessage(log.message || log.event || log.text)}</span></div>`).join('')
+    ? recentLogs.slice(0, 8).map(log => `<div class="system-log-row"><span class="timeline-time">${formatSystemDateTime(firstValue(log.time_iso, log.created_at_iso, log.updated_at, log.created_at, log.time))}</span><span>${highlightMessage(log.message || log.event || log.text)}</span></div>`).join('')
     : '<div class="empty-state">Chưa có nhật ký hệ thống.</div>';
 }
 
@@ -1279,12 +1630,12 @@ function renderActivityLogs() {
   const search = (document.getElementById('logSearch')?.value || '').toLowerCase();
   const logs = arr(dashboardData.activity_logs).filter(l => (activeLogFilter === 'all' || l.type === activeLogFilter) && safeStatus(l.message).toLowerCase().includes(search));
   document.getElementById('activityLogs').innerHTML = logs.length
-    ? logs.map(log => `<div class="timeline-row"><span class="timeline-time">${safe(log.time)}</span><span class="log-type ${typeClass(log.type)}">${publicLogType(log.type)}</span><span>${highlightMessage(log.message)}</span></div>`).join('')
+    ? logs.map(log => `<div class="timeline-row"><span class="timeline-time">${formatActivityLogTime(log)}</span><span class="log-type ${typeClass(log.type)}">${publicLogType(log.type)}</span><span>${highlightMessage(log.message)}</span></div>`).join('')
     : '<div class="empty-state">Chưa có nhật ký</div>';
 }
 
 function logRow(log) {
-  return `<div class="timeline-row"><span class="timeline-time">${safeStatus(log.time).slice(0,5) || '--'}</span><span class="timeline-dot ${dotClass(log.type)}"></span><span>${highlightMessage(log.message)}</span></div>`;
+  return `<div class="timeline-row"><span class="timeline-time">${formatActivityLogTime(log)}</span><span class="timeline-dot ${dotClass(log.type)}"></span><span>${highlightMessage(log.message)}</span></div>`;
 }
 function dotClass(type) { return type === 'Cảnh báo' ? 'yellow' : type === 'Thoát lệnh' ? 'red' : type === 'Vào lệnh' ? 'green' : ''; }
 function typeClass(type) { return type === 'Cảnh báo' ? 'num-red' : type === 'Thoát lệnh' ? 'num-red' : type === 'Vào lệnh' ? 'num-green' : type === 'Tín hiệu' ? 'num-cyan' : 'num-cyan'; }
@@ -1336,11 +1687,15 @@ function bindEvents() {
     }
   }));
   document.getElementById('logSearch')?.addEventListener('input', renderActivityLogs);
+  document.querySelectorAll('.range-filter-button').forEach(button => {
+    button.addEventListener('click', () => handleTimeRangeChange(button.dataset.range));
+  });
 }
 
 function renderAll() {
   ensureSystemTab();
   ensureTradeJournalLayout();
+  ensureHeaderRangeFilter();
   bindEvents();
   renderHeader();
   renderHome();
