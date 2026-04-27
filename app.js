@@ -349,22 +349,26 @@ function readDirectionCount(direction) {
   return arr(dashboardData.signals).filter(sig => sig.direction === direction).length;
 }
 
+function normalizeOutcomeLabel(value) {
+  const text = safeStatus(value).toUpperCase();
+  if (/\bTP1\b/.test(text)) return 'TP1';
+  if (/\bTP2\b/.test(text)) return 'TP2';
+  if (/\bSL\b/.test(text) || text.includes('STOP LOSS')) return 'SL';
+  return '';
+}
+
 function readOutcomeCounts() {
   const counts = { SL: 0, TP1: 0, TP2: 0 };
   arr(dashboardData.result_distribution).forEach(item => {
-    const label = safeStatus(item.label).toUpperCase();
-    if (label.includes('TP1')) counts.TP1 += safeNumber(item.count);
-    else if (label.includes('TP2')) counts.TP2 += safeNumber(item.count);
-    else if (label.includes('SL')) counts.SL += safeNumber(item.count);
+    const outcome = normalizeOutcomeLabel(item.label || item.result || item.status);
+    if (outcome) counts[outcome] += safeNumber(item.count);
   });
 
   if (Object.values(counts).some(Boolean)) return counts;
 
   arr(dashboardData.recent_results).forEach(item => {
-    const result = safeStatus(item.result).toUpperCase();
-    if (result.includes('TP1')) counts.TP1 += 1;
-    else if (result.includes('TP2')) counts.TP2 += 1;
-    else if (result.includes('SL')) counts.SL += 1;
+    const outcome = normalizeOutcomeLabel(item.result || item.label || item.status);
+    if (outcome) counts[outcome] += 1;
   });
 
   return counts;
@@ -395,8 +399,6 @@ function readTotalSignals() {
 function signalDistributionItems() {
   const outcomes = readOutcomeCounts();
   return [
-    { label: 'LONG', count: readDirectionCount('LONG'), color: 'var(--green)', cls: 'num-green' },
-    { label: 'SHORT', count: readDirectionCount('SHORT'), color: 'var(--red)', cls: 'num-red' },
     { label: 'SL', count: outcomes.SL, color: 'var(--red)', cls: 'num-red' },
     { label: 'TP1', count: outcomes.TP1, color: 'var(--cyan)', cls: 'num-cyan' },
     { label: 'TP2', count: outcomes.TP2, color: 'rgba(72, 168, 255, .95)', cls: 'num-cyan' }
@@ -404,20 +406,21 @@ function signalDistributionItems() {
 }
 
 function renderSignalDistribution(targetId, { showTotalLine = false } = {}) {
-  const total = readTotalSignals();
   const items = signalDistributionItems();
+  const distributionTotal = items.reduce((sum, item) => sum + safeNumber(item.count), 0);
+  const totalSignals = readTotalSignals();
 
   const target = document.getElementById(targetId);
   if (!target) return;
   target.classList.add('home-distribution');
   target.innerHTML = `
     <div class="home-donut" style="background:${homeDonutBackground(items)}">
-      <div class="home-donut-inner"><strong>${total}</strong><span>Tổng</span></div>
+      <div class="home-donut-inner"><strong>${distributionTotal}</strong><span>Tổng</span></div>
     </div>
     <div class="home-distribution-legend">
-      ${items.map(item => `<div class="home-legend-item"><span class="dot" style="background:${item.color}"></span><span>${item.label}</span><strong class="${item.cls}">${safeNumber(item.count)} (${formatPercent(percentOf(item.count, total))})</strong></div>`).join('')}
+      ${items.map(item => `<div class="home-legend-item"><span class="dot" style="background:${item.color}"></span><span>${item.label}</span><strong class="${item.cls}">${safeNumber(item.count)} (${formatPercent(percentOf(item.count, distributionTotal))})</strong></div>`).join('')}
     </div>
-    ${showTotalLine ? `<div class="distribution-total-line">Tổng tín hiệu: <strong>${total}</strong></div>` : ''}`;
+    ${showTotalLine ? `<div class="distribution-total-line">Tổng tín hiệu: <strong>${totalSignals}</strong></div>` : ''}`;
 }
 
 function renderPerformanceDistribution() {
