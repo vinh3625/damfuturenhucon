@@ -935,12 +935,12 @@ body.data-refreshing .live-badge {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
 }
 
 .home-donut {
-  width: 128px;
-  height: 128px;
+  width: 118px;
+  height: 118px;
   border-radius: 50%;
   display: grid;
   place-items: center;
@@ -951,8 +951,8 @@ body.data-refreshing .live-badge {
 .home-donut::after {
   content: "";
   position: absolute;
-  width: 74px;
-  height: 74px;
+  width: 68px;
+  height: 68px;
   border-radius: 50%;
   background: #050a0a;
   border: 1px solid rgba(255, 255, 255, .08);
@@ -980,26 +980,32 @@ body.data-refreshing .live-badge {
 
 .home-distribution-legend {
   width: 100%;
-  display: flex;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: 8px 10px;
+  display: grid;
+  gap: 0;
   min-width: 0;
 }
 
 .home-legend-item {
-  display: inline-flex;
+  display: grid;
+  grid-template-columns: 12px minmax(0, 1fr) auto;
   align-items: center;
-  gap: 5px;
+  gap: 8px;
   min-width: 0;
   color: #cbd7d6;
   font-size: 13px;
   line-height: 1.25;
-  white-space: nowrap;
+  padding: 7px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, .08);
+}
+
+.home-legend-item:last-child {
+  border-bottom: 0;
 }
 
 .home-legend-item strong {
   font-size: 12px;
+  text-align: right;
+  white-space: nowrap;
 }
 
 .home-signal-stats {
@@ -1056,7 +1062,7 @@ body.data-refreshing .live-badge {
     grid-template-columns: 1fr;
   }
 
-  .home-legend-item {
-    white-space: normal;
+  .home-legend-item strong {
+    white-space: nowrap;
   }
 }
