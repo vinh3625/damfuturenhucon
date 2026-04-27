@@ -207,7 +207,6 @@ function freshnessText(value) {
 }
 
 function renderHome() {
-  ensureHomeLayout();
   const s = dashboardData.summary || {};
   document.getElementById('homeKpis').innerHTML = [
     kpiCard('📡', 'Tổng tín hiệu', safeNumber(s.total_signals), '30 ngày gần nhất', false, 'summary.total_signals'),
@@ -239,7 +238,9 @@ function renderHome() {
   </div>`;
 
   const activeTrades = arr(dashboardData.active_trades);
-  renderActiveTrades(activeTrades);
+  document.getElementById('activeTradesBody').innerHTML = activeTrades.length
+    ? activeTrades.map(t => tradeRow(t, metricChanged('active_trades.count'))).join('')
+    : '<tr><td colspan="7" class="empty-state">Chưa có lệnh đang chạy</td></tr>';
 
   document.getElementById('livePanelList').innerHTML = arr(dashboardData.live_panel).map(item => {
     const status = sanitizePublicText(item.status);
@@ -247,99 +248,6 @@ function renderHome() {
     return `<div class="live-row"><strong>${safe(item.symbol)}</strong><span><i class="state-dot ${safeStatus(status).includes('lệnh') ? 'green' : ''}"></i>${status}</span><span class="${safeStatus(note).includes('Chờ') ? 'num-red' : safeStatus(note).includes('setup') ? 'num-green' : ''}">${note}</span></div>`;
   }).join('');
   renderSystemMini('systemMini');
-  renderHomePerformancePanels();
-  renderRecentResults();
-  renderShortLogs();
-}
-
-function ensureHomeLayout() {
-  const home = document.getElementById('tab-home');
-  const activeTradesBody = document.getElementById('activeTradesBody');
-  const activeGrid = activeTradesBody?.closest('.two-col');
-  const activePanel = activeTradesBody?.closest('.panel');
-  const livePanel = document.getElementById('livePanelList')?.closest('.panel');
-  const bottomGrid = document.getElementById('recentResults')?.closest('.two-col');
-  const riskBanner = home?.querySelector('.risk-banner');
-
-  activeGrid?.classList.add('home-active-grid');
-  activePanel?.classList.add('home-active-panel');
-  livePanel?.classList.add('home-live-panel');
-  bottomGrid?.classList.add('home-bottom-grid');
-  riskBanner?.classList.add('home-risk-hidden');
-
-  if (!document.getElementById('homeAnalyticsGrid') && activeGrid) {
-    const analytics = document.createElement('div');
-    analytics.id = 'homeAnalyticsGrid';
-    analytics.className = 'home-analytics-grid';
-    analytics.innerHTML = `
-      <section class="panel home-performance-panel">
-        <div class="panel-title">↗ Hiệu suất 30 ngày</div>
-        <div class="legend home-chart-legend"><span class="dot green"></span> Tổng lợi nhuận (R) <span class="dash"></span> Vốn tham chiếu (0R)</div>
-        <div id="homeLineChart" class="line-chart home-line-chart"></div>
-        <div class="home-metric-strip" id="homePerformanceStats"></div>
-      </section>
-      <section class="panel home-distribution-panel">
-        <div class="panel-title">◔ Phân bổ tín hiệu</div>
-        <div id="homeDistribution" class="distribution home-distribution"></div>
-      </section>
-      <section class="panel home-signal-stats-panel">
-        <div class="panel-title">▦ Thống kê tín hiệu</div>
-        <div id="homeSignalStats" class="home-signal-stats"></div>
-      </section>`;
-    activeGrid.insertAdjacentElement('afterend', analytics);
-  }
-}
-
-function renderActiveTrades(activeTrades = []) {
-  document.getElementById('activeTradesBody').innerHTML = activeTrades.length
-    ? activeTrades.map(t => tradeRow(t, metricChanged('active_trades.count'))).join('')
-    : '<tr><td colspan="7" class="empty-state">Hiện tại không có lệnh nào đang mở</td></tr>';
-}
-
-function renderHomePerformancePanels() {
-  const s = dashboardData.summary || {};
-  renderLineChart('homeLineChart');
-  renderDistribution('homeDistribution');
-
-  document.getElementById('homePerformanceStats').innerHTML = [
-    homeMetric('Tổng PnL', fmtR(s.total_r), safeNumber(s.total_r) < 0 ? 'num-red' : 'num-green'),
-    homeMetric('Win rate', `${safeNumber(s.win_rate)}%`, 'num-green'),
-    homeMetric('Số lệnh', safeNumber(s.total_signals), 'num-cyan')
-  ].join('');
-
-  renderHomeSignalStats();
-}
-
-function homeMetric(label, value, cls = '') {
-  return `<div class="home-mini-stat"><span>${label}</span><strong class="${cls}">${safe(value)}</strong></div>`;
-}
-
-function renderHomeSignalStats() {
-  const s = dashboardData.summary || {};
-  const signals = arr(dashboardData.signals);
-  const longCount = signals.filter(sig => sig.direction === 'LONG').length;
-  const shortCount = signals.filter(sig => sig.direction === 'SHORT').length;
-  const pendingCount = s.pending_signals ?? signals.filter(sig => safeStatus(sig.status).includes('Chờ')).length;
-  const closedCount = s.closed_signals ?? signals.filter(sig => {
-    const status = safeStatus(sig.status);
-    return ['TP1', 'TP2', 'SL', 'Thoát'].some(x => status.includes(x));
-  }).length;
-  const canceledCount = signals.filter(sig => /hủy|huỷ|cancel/i.test(safeStatus(sig.status))).length;
-  const rows = [
-    ['Tổng tín hiệu', safeNumber(s.total_signals, signals.length), 'num-cyan'],
-    ['LONG', longCount, 'num-green'],
-    ['SHORT', shortCount, 'num-red'],
-    ['Đang chờ', safeNumber(pendingCount), 'num-cyan'],
-    ['Đã đóng', safeNumber(closedCount), 'num-green']
-  ];
-  if (canceledCount) rows.push(['Đã hủy', canceledCount, 'num-red']);
-
-  document.getElementById('homeSignalStats').innerHTML = rows
-    .map(([label, value, cls]) => `<div class="home-stat-row"><span>${label}</span><strong class="${cls}">${safe(value)}</strong></div>`)
-    .join('');
-}
-
-function renderRecentResults() {
   const recentResults = arr(dashboardData.recent_results);
   document.getElementById('recentResults').innerHTML = recentResults.length
     ? recentResults.map(r => {
@@ -347,9 +255,6 @@ function renderRecentResults() {
       return `<div class="result-row"><strong><span class="coin-icon" style="width:28px;height:28px;font-size:14px;margin-right:8px">${iconFor(r.symbol)}</span>${safe(r.symbol)}</strong><span class="${clsDir(r.direction)}">${safe(r.direction)}</span><strong class="${safeStatus(result).includes('SL') ? 'num-red' : safeStatus(result).includes('Thoát') ? 'num-cyan' : 'num-green'}">${result}</strong><strong class="${safeNumber(r.r) < 0 ? 'num-red' : 'num-green'}">${fmtR(r.r)}</strong></div>`;
     }).join('')
     : '<div class="empty-state">Chưa có kết quả gần đây</div>';
-}
-
-function renderShortLogs() {
   document.getElementById('shortLogs').innerHTML = arr(dashboardData.activity_logs).slice(0, 5).map(logRow).join('');
 }
 
@@ -480,12 +385,10 @@ function insight(icon, label, value, rightLabel, rightValue) {
   return `<div class="insight-row"><div class="kpi-icon" style="width:44px;height:44px;font-size:20px">${icon}</div><div><small>${label}</small><br><strong style="font-size:23px">${safe(value)}</strong></div><div style="text-align:right"><small>${rightLabel}</small><br><strong class="num-green" style="font-size:22px">${safe(rightValue)}</strong></div></div>`;
 }
 
-function renderLineChart(targetId = 'lineChart') {
-  const target = document.getElementById(targetId);
-  if (!target) return;
+function renderLineChart() {
   const data = arr(dashboardData.performance_30d);
   if (!data.length) {
-    target.innerHTML = '<div class="empty-state">Chưa có dữ liệu hiệu suất</div>';
+    document.getElementById('lineChart').innerHTML = '<div class="empty-state">Chưa có dữ liệu hiệu suất</div>';
     return;
   }
 
@@ -513,7 +416,7 @@ function renderLineChart(targetId = 'lineChart') {
   const bx = Math.min(w - padR + 10, x(data.length - 1) - 6);
   const by = Math.max(8, y(safeNumber(last.r)) - 28);
 
-  target.innerHTML = `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">${grid}<polygon class="performance-area" points="${area}"/><polyline class="performance-line" points="${pts}"/><line class="chart-grid" stroke-dasharray="5 5" x1="${padL}" x2="${w-padR+14}" y1="${y(0)}" y2="${y(0)}"/>${labels}<rect x="${bx}" y="${by}" width="70" height="26" rx="9" fill="rgba(103,240,92,.18)" stroke="rgba(103,240,92,.8)"/><text x="${bx+8}" y="${by+18}" fill="#67f05c" font-size="15" font-weight="800">${fmtR(last.r)}</text></svg>`;
+  document.getElementById('lineChart').innerHTML = `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">${grid}<polygon class="performance-area" points="${area}"/><polyline class="performance-line" points="${pts}"/><line class="chart-grid" stroke-dasharray="5 5" x1="${padL}" x2="${w-padR+14}" y1="${y(0)}" y2="${y(0)}"/>${labels}<rect x="${bx}" y="${by}" width="70" height="26" rx="9" fill="rgba(103,240,92,.18)" stroke="rgba(103,240,92,.8)"/><text x="${bx+8}" y="${by+18}" fill="#67f05c" font-size="15" font-weight="800">${fmtR(last.r)}</text></svg>`;
 }
 function renderWeeklyBars() {
   const weeklyResults = arr(dashboardData.weekly_results);
@@ -526,11 +429,9 @@ function renderWeeklyBars() {
     : '<div class="empty-state">Chưa có kết quả theo tuần</div>';
 }
 
-function renderDistribution(targetId = 'distribution') {
-  const target = document.getElementById(targetId);
-  if (!target) return;
+function renderDistribution() {
   const total = safeNumber(dashboardData.summary?.total_signals);
-  target.innerHTML = `<div class="donut"><div class="donut-inner"><strong>${total}</strong><br><span>Tín hiệu</span></div></div><div class="legend-list">${arr(dashboardData.result_distribution).map((x,i)=>`<div><span class="dot" style="background:${['var(--green)','var(--cyan)','var(--red)','var(--yellow)'][i]}"></span> ${safe(x.label)} <strong style="float:right">${safeNumber(x.count)} (${safeNumber(x.percent)}%)</strong></div>`).join('')}<small>Tổng: ${total} tín hiệu</small></div>`;
+  document.getElementById('distribution').innerHTML = `<div class="donut"><div class="donut-inner"><strong>${total}</strong><br><span>Tín hiệu</span></div></div><div class="legend-list">${arr(dashboardData.result_distribution).map((x,i)=>`<div><span class="dot" style="background:${['var(--green)','var(--cyan)','var(--red)','var(--yellow)'][i]}"></span> ${safe(x.label)} <strong style="float:right">${safeNumber(x.count)} (${safeNumber(x.percent)}%)</strong></div>`).join('')}<small>Tổng: ${total} tín hiệu</small></div>`;
 }
 
 function renderLogs() {
