@@ -10,7 +10,10 @@ let refreshInFlight = false;
 
 const DASHBOARD_API_URL = 'https://bingx-dashboard-api.nguyenvanvinh030625.workers.dev/dashboard';
 const LOCAL_FALLBACK_URL = 'public_dashboard.json';
+const DEMO_DASHBOARD_URL = 'public_dashboard.demo.json';
 const DISPLAY_BRAND_NAME = '@damfuturenhucon';
+const isDemoMode = new URLSearchParams(window.location.search).get('demo') === '1'
+  && ['localhost', '127.0.0.1'].includes(window.location.hostname);
 
 const coinIconMap = {
   BTC: '₿', ETH: '◆', SOL: '≋', BNB: '◇', XRP: '✕', DOGE: 'Ð', ADA: '●', AVAX: '▲', MATIC: '⬡', LINK: '⬢'
@@ -103,6 +106,13 @@ function ensureFavicon() {
 }
 
 async function loadDashboardData() {
+  if (isDemoMode) {
+    console.info('[dashboard] Demo mode: using public_dashboard.demo.json');
+    const demo = await fetch(DEMO_DASHBOARD_URL, { cache: 'no-store' });
+    if (!demo.ok) throw new Error(`Demo dashboard fetch failed: ${demo.status}`);
+    return await demo.json();
+  }
+
   try {
     const res = await fetch(DASHBOARD_API_URL, { cache: 'no-store' });
     if (!res.ok) throw new Error(`Worker fetch failed: ${res.status}`);
@@ -665,7 +675,9 @@ function formatWeekDate(value) {
 }
 
 function weeklyLabelHtml(week = {}) {
-  const [start = '--', end = '--'] = safeStatus(week.range).split(/\s+-\s+/);
+  const [rangeStart = '--', rangeEnd = '--'] = safeStatus(week.range).split(/\s+-\s+/);
+  const start = week.start_date || rangeStart;
+  const end = week.end_date || rangeEnd;
   return `<div class="bar-label">
     <span>${safe(week.label)}</span>
     <span class="bar-separator">•</span>

@@ -1,0 +1,551 @@
+{
+  "cloudflare_published_at": "2026-04-27T09:30:00+07:00",
+  "bot": {
+    "name": "BINGX SIGNAL BOT",
+    "status": "online",
+    "status_text": "Online",
+    "updated_at": "2026-04-27T09:30:00+07:00",
+    "mode": "local_demo"
+  },
+  "summary": {
+    "total_signals": 18,
+    "win_rate": 66.7,
+    "total_r": 8.4,
+    "active_trades": 2,
+    "max_drawdown_r": -1.6,
+    "today_signals": 4,
+    "active_signals": 3,
+    "pending_signals": 1,
+    "closed_signals": 14
+  },
+  "latest_signal": {
+    "symbol": "BTCUSDT",
+    "direction": "LONG",
+    "system": "SWING_M15",
+    "timeframe": "M15",
+    "entry": 67320.5,
+    "sl": 66880.0,
+    "tp1": 67920.0,
+    "tp2": 68650.0,
+    "status": "Đang chạy",
+    "confidence": 88,
+    "created_at": "27/04/2026 09:22",
+    "created_at_iso": "2026-04-27T09:22:00+07:00",
+    "date": "27/04/2026",
+    "time": "09:22",
+    "display_time": "27/04/2026 09:22",
+    "note": "Tín hiệu demo dùng để kiểm tra giao diện local."
+  },
+  "signals": [
+    {
+      "symbol": "BTCUSDT",
+      "direction": "LONG",
+      "system": "SWING_M15",
+      "timeframe": "M15",
+      "entry": 67320.5,
+      "sl": 66880.0,
+      "tp1": 67920.0,
+      "tp2": 68650.0,
+      "status": "Đang chạy",
+      "confidence": 88,
+      "created_at": "27/04/2026 09:22",
+      "created_at_iso": "2026-04-27T09:22:00+07:00",
+      "date": "27/04/2026",
+      "time": "09:22",
+      "display_time": "27/04/2026 09:22",
+      "note": "Tín hiệu demo đang theo dõi."
+    },
+    {
+      "symbol": "ETHUSDT",
+      "direction": "SHORT",
+      "system": "INTRADAY_M5",
+      "timeframe": "M5",
+      "entry": 3278.4,
+      "sl": 3302.0,
+      "tp1": 3248.8,
+      "tp2": 3218.0,
+      "status": "Đang chạy",
+      "confidence": 82,
+      "created_at": "27/04/2026 08:55",
+      "created_at_iso": "2026-04-27T08:55:00+07:00",
+      "date": "27/04/2026",
+      "time": "08:55",
+      "display_time": "27/04/2026 08:55",
+      "note": "Momentum giảm trong phiên sáng."
+    },
+    {
+      "symbol": "SOLUSDT",
+      "direction": "LONG",
+      "system": "POSITION_H1",
+      "timeframe": "H1",
+      "entry": 152.3,
+      "sl": 148.9,
+      "tp1": 156.6,
+      "tp2": 161.4,
+      "status": "Chờ xác nhận",
+      "confidence": 76,
+      "created_at": "27/04/2026 08:10",
+      "created_at_iso": "2026-04-27T08:10:00+07:00",
+      "date": "27/04/2026",
+      "time": "08:10",
+      "display_time": "27/04/2026 08:10",
+      "note": "Chờ xác nhận sau khi nến H1 đóng."
+    },
+    {
+      "symbol": "BNBUSDT",
+      "direction": "SHORT",
+      "system": "SWING_M15",
+      "timeframe": "M15",
+      "entry": 612.8,
+      "sl": 620.4,
+      "tp1": 604.6,
+      "tp2": 596.2,
+      "status": "TP1 HIT",
+      "confidence": 79,
+      "created_at": "26/04/2026 21:40",
+      "created_at_iso": "2026-04-26T21:40:00+07:00",
+      "date": "26/04/2026",
+      "time": "21:40",
+      "display_time": "26/04/2026 21:40",
+      "note": "Đã chạm TP1 trong phiên tối."
+    },
+    {
+      "symbol": "XRPUSDT",
+      "direction": "LONG",
+      "system": "INTRADAY_M5",
+      "timeframe": "M5",
+      "entry": 0.5482,
+      "sl": 0.539,
+      "tp1": 0.558,
+      "tp2": 0.5695,
+      "status": "TP2 HIT",
+      "confidence": 84,
+      "created_at": "26/04/2026 19:05",
+      "created_at_iso": "2026-04-26T19:05:00+07:00",
+      "date": "26/04/2026",
+      "time": "19:05",
+      "display_time": "26/04/2026 19:05",
+      "note": "Đã hoàn tất TP2."
+    },
+    {
+      "symbol": "ADAUSDT",
+      "direction": "SHORT",
+      "system": "POSITION_H1",
+      "timeframe": "H1",
+      "entry": 0.462,
+      "sl": 0.471,
+      "tp1": 0.451,
+      "tp2": 0.438,
+      "status": "SL",
+      "confidence": 71,
+      "created_at": "26/04/2026 16:20",
+      "created_at_iso": "2026-04-26T16:20:00+07:00",
+      "date": "26/04/2026",
+      "time": "16:20",
+      "display_time": "26/04/2026 16:20",
+      "note": "Đã chạm SL."
+    }
+  ],
+  "active_trades": [
+    {
+      "symbol": "BTCUSDT",
+      "direction": "LONG",
+      "entry": 67320.5,
+      "tp1": 67920.0,
+      "tp2": 68650.0,
+      "sl": 66880.0,
+      "status": "Đang chạy"
+    },
+    {
+      "symbol": "ETHUSDT",
+      "direction": "SHORT",
+      "entry": 3278.4,
+      "tp1": 3248.8,
+      "tp2": 3218.0,
+      "sl": 3302.0,
+      "status": "Đang chạy"
+    }
+  ],
+  "live_panel": [
+    {
+      "symbol": "BTCUSDT",
+      "status": "Đang chạy",
+      "note": "LONG | Entry 67320.5"
+    },
+    {
+      "symbol": "ETHUSDT",
+      "status": "Đang chạy",
+      "note": "SHORT | Entry 3278.4"
+    }
+  ],
+  "recent_results": [
+    {
+      "symbol": "XRPUSDT",
+      "direction": "LONG",
+      "result": "TP2 HIT",
+      "r": 2.0,
+      "time": "26/04/2026 20:12"
+    },
+    {
+      "symbol": "BNBUSDT",
+      "direction": "SHORT",
+      "result": "TP1 HIT",
+      "r": 1.0,
+      "time": "26/04/2026 22:18"
+    },
+    {
+      "symbol": "ADAUSDT",
+      "direction": "SHORT",
+      "result": "SL",
+      "r": -1.0,
+      "time": "26/04/2026 17:02"
+    },
+    {
+      "symbol": "SOLUSDT",
+      "direction": "LONG",
+      "result": "TP1 HIT",
+      "r": 1.0,
+      "time": "25/04/2026 14:36"
+    },
+    {
+      "symbol": "LINKUSDT",
+      "direction": "LONG",
+      "result": "SL",
+      "r": -1.0,
+      "time": "25/04/2026 10:45"
+    },
+    {
+      "symbol": "AVAXUSDT",
+      "direction": "SHORT",
+      "result": "TP2 HIT",
+      "r": 2.0,
+      "time": "24/04/2026 23:08"
+    }
+  ],
+  "activity_logs": [
+    {
+      "time": "09:30",
+      "type": "Trạng thái",
+      "message": "Dashboard demo local đã đồng bộ dữ liệu."
+    },
+    {
+      "time": "09:22",
+      "type": "Tín hiệu",
+      "message": "BTCUSDT LONG M15 - Đang chạy"
+    },
+    {
+      "time": "08:55",
+      "type": "Vào lệnh",
+      "message": "ETHUSDT SHORT đã vào lệnh tại 3278.4"
+    },
+    {
+      "time": "08:10",
+      "type": "Tín hiệu",
+      "message": "SOLUSDT LONG H1 - Chờ xác nhận"
+    },
+    {
+      "time": "22:18",
+      "type": "Thoát lệnh",
+      "message": "BNBUSDT SHORT TP1 HIT +1.0R"
+    },
+    {
+      "time": "20:12",
+      "type": "Thoát lệnh",
+      "message": "XRPUSDT LONG TP2 HIT +2.0R"
+    },
+    {
+      "time": "17:02",
+      "type": "Thoát lệnh",
+      "message": "ADAUSDT SHORT SL -1.0R"
+    },
+    {
+      "time": "16:40",
+      "type": "Cảnh báo",
+      "message": "Biến động tăng, kiểm tra risk lock trước khi vào lệnh mới."
+    }
+  ],
+  "system": {
+    "bot_status_text": "Online",
+    "scan_status": "Chờ nến đóng",
+    "risk_lock": false,
+    "active_positions": 2,
+    "active_signals": 3,
+    "pending_signals": 1,
+    "closed_today": 4,
+    "daily_loss_count": 0,
+    "scan_timeframes": [
+      {
+        "timeframe": "M5",
+        "role": "Intraday",
+        "last_scan": "09:25",
+        "next_scan": "09:35",
+        "status": "Chờ nến đóng"
+      },
+      {
+        "timeframe": "M15",
+        "role": "Swing",
+        "last_scan": "09:15",
+        "next_scan": "09:45",
+        "status": "Chờ nến đóng"
+      },
+      {
+        "timeframe": "H1",
+        "role": "Position",
+        "last_scan": "09:00",
+        "next_scan": "10:00",
+        "status": "Chờ nến đóng"
+      }
+    ],
+    "watchlist_public": [
+      "BTC",
+      "ETH",
+      "SOL",
+      "XRP",
+      "BNB",
+      "TRX",
+      "DOGE",
+      "ADA",
+      "LINK",
+      "AVAX",
+      "SUI",
+      "LTC",
+      "BCH",
+      "DOT",
+      "UNI",
+      "APT",
+      "NEAR",
+      "ETC",
+      "FIL",
+      "HYPE"
+    ],
+    "data_status": "Bình thường",
+    "cache_status": "Reuse",
+    "stale_data": false,
+    "dashboard_sync": "OK",
+    "execution_mode_public": "bingx_live",
+    "send_group_calls": true,
+    "send_admin_reports": true,
+    "last_reset_at": "27/04/2026 07:00",
+    "last_m5_scan": "09:25",
+    "last_error": "",
+    "recent_system_logs": [
+      {
+        "time": "09:30",
+        "message": "Dashboard sync OK"
+      },
+      {
+        "time": "09:25",
+        "message": "Scan M5 hoàn tất, chờ nến đóng tiếp theo"
+      },
+      {
+        "time": "09:15",
+        "message": "Scan M15 hoàn tất, không phát hiện lỗi"
+      },
+      {
+        "time": "09:00",
+        "message": "Scan H1 hoàn tất, hệ thống ổn định"
+      }
+    ]
+  },
+  "performance_30d": [
+    {
+      "date": "2026-03-29",
+      "r": -1.0
+    },
+    {
+      "date": "2026-03-30",
+      "r": -0.6
+    },
+    {
+      "date": "2026-03-31",
+      "r": 0.2
+    },
+    {
+      "date": "2026-04-01",
+      "r": 1.0
+    },
+    {
+      "date": "2026-04-02",
+      "r": 0.5
+    },
+    {
+      "date": "2026-04-03",
+      "r": 1.4
+    },
+    {
+      "date": "2026-04-04",
+      "r": 2.1
+    },
+    {
+      "date": "2026-04-05",
+      "r": 1.7
+    },
+    {
+      "date": "2026-04-06",
+      "r": 2.8
+    },
+    {
+      "date": "2026-04-07",
+      "r": 3.6
+    },
+    {
+      "date": "2026-04-08",
+      "r": 3.1
+    },
+    {
+      "date": "2026-04-09",
+      "r": 4.4
+    },
+    {
+      "date": "2026-04-10",
+      "r": 5.0
+    },
+    {
+      "date": "2026-04-11",
+      "r": 4.1
+    },
+    {
+      "date": "2026-04-12",
+      "r": 5.6
+    },
+    {
+      "date": "2026-04-13",
+      "r": 6.2
+    },
+    {
+      "date": "2026-04-14",
+      "r": 5.7
+    },
+    {
+      "date": "2026-04-15",
+      "r": 6.8
+    },
+    {
+      "date": "2026-04-16",
+      "r": 7.4
+    },
+    {
+      "date": "2026-04-17",
+      "r": 6.9
+    },
+    {
+      "date": "2026-04-18",
+      "r": 7.8
+    },
+    {
+      "date": "2026-04-19",
+      "r": 8.5
+    },
+    {
+      "date": "2026-04-20",
+      "r": 8.0
+    },
+    {
+      "date": "2026-04-21",
+      "r": 9.2
+    },
+    {
+      "date": "2026-04-22",
+      "r": 9.8
+    },
+    {
+      "date": "2026-04-23",
+      "r": 9.1
+    },
+    {
+      "date": "2026-04-24",
+      "r": 10.4
+    },
+    {
+      "date": "2026-04-25",
+      "r": 11.0
+    },
+    {
+      "date": "2026-04-26",
+      "r": 10.6
+    },
+    {
+      "date": "2026-04-27",
+      "r": 11.8
+    }
+  ],
+  "weekly_results": [
+    {
+      "label": "Tuần -3",
+      "range": "2026-04-06 - 2026-04-12",
+      "start_date": "2026-04-06",
+      "end_date": "2026-04-12",
+      "r": 2.8
+    },
+    {
+      "label": "Tuần -2",
+      "range": "2026-04-13 - 2026-04-19",
+      "start_date": "2026-04-13",
+      "end_date": "2026-04-19",
+      "r": 3.4
+    },
+    {
+      "label": "Tuần -1",
+      "range": "2026-04-20 - 2026-04-26",
+      "start_date": "2026-04-20",
+      "end_date": "2026-04-26",
+      "r": 2.4
+    },
+    {
+      "label": "Tuần này",
+      "range": "2026-04-27 - 2026-05-03",
+      "start_date": "2026-04-27",
+      "end_date": "2026-05-03",
+      "r": 1.8
+    }
+  ],
+  "result_distribution": [
+    {
+      "label": "SL",
+      "count": 3,
+      "percent": 21.4
+    },
+    {
+      "label": "TP1 HIT",
+      "count": 7,
+      "percent": 50.0
+    },
+    {
+      "label": "TP2 HIT",
+      "count": 4,
+      "percent": 28.6
+    }
+  ],
+  "pair_performance": [
+    {
+      "symbol": "BTCUSDT",
+      "trades": 6,
+      "win_rate": 66.7,
+      "r": 3.2
+    },
+    {
+      "symbol": "ETHUSDT",
+      "trades": 5,
+      "win_rate": 60.0,
+      "r": 1.7
+    },
+    {
+      "symbol": "SOLUSDT",
+      "trades": 4,
+      "win_rate": 75.0,
+      "r": 2.4
+    },
+    {
+      "symbol": "BNBUSDT",
+      "trades": 3,
+      "win_rate": 66.7,
+      "r": 1.1
+    }
+  ],
+  "daily_events": {
+    "signals_created": 4,
+    "entries_executed": 2,
+    "tp_hit": 3,
+    "sl_hit": 1
+  }
+}
