@@ -231,7 +231,7 @@ function ensureSystemTab() {
         <div class="system-two-col">
           <section class="panel">
             <div class="panel-title">▣ Dữ liệu thị trường</div>
-            <div class="system-list" id="marketDataStatus"></div>
+            <div class="system-info-list" id="marketDataStatus"></div>
           </section>
           <section class="panel">
             <div class="panel-title">↔ Lệnh &amp; vị thế</div>
@@ -744,6 +744,38 @@ function systemListRow(label, value, cls = '') {
   return `<div class="system-list-row"><span>${label}</span><strong class="${cls}">${safe(value)}</strong></div>`;
 }
 
+function systemInfoRow(label, value, cls = '') {
+  return `<div class="system-info-row"><span>${label}</span><strong class="${cls}">${safe(value)}</strong></div>`;
+}
+
+function watchlistItems(value) {
+  const source = Array.isArray(value)
+    ? value
+    : safeStatus(value).split(/[,\s|]+/);
+  return source
+    .map(item => safeStatus(item).trim())
+    .filter(Boolean)
+    .map(item => item.replace(/USDT$/i, '').toUpperCase());
+}
+
+function renderWatchlistChips(watchlist) {
+  const items = watchlistItems(watchlist);
+  if (!items.length) {
+    return `<div class="watchlist-block">
+      <div class="watchlist-label">Watchlist</div>
+      <div class="watchlist-empty">--</div>
+    </div>`;
+  }
+
+  const visibleItems = items.slice(0, 10);
+  const moreCount = Math.max(0, items.length - visibleItems.length);
+  return `<div class="watchlist-block">
+    <div class="watchlist-label">Watchlist</div>
+    <div class="watchlist-chips">${visibleItems.map(item => `<span class="watchlist-chip">${item}</span>`).join('')}</div>
+    ${moreCount ? `<div class="watchlist-more">+ ${moreCount} cặp khác</div>` : ''}
+  </div>`;
+}
+
 function systemStatusCard(icon, label, value, note, cls = '') {
   return `<article class="system-status-card">
     <div class="system-card-icon">${icon}</div>
@@ -781,11 +813,11 @@ function renderSystemTab() {
   </tr>`).join('');
 
   document.getElementById('marketDataStatus').innerHTML = [
-    systemListRow('Watchlist', displayList(sys.watchlist_public)),
-    systemListRow('Data status', safe(sys.data_status, 'Bình thường'), 'num-green'),
-    systemListRow('Cache', safe(sys.cache_status)),
-    systemListRow('Stale data', displayNormalBool(sys.stale_data), sys.stale_data ? 'num-red' : 'num-green'),
-    systemListRow('Đồng bộ dashboard', safe(sys.dashboard_sync, 'Bình thường'), 'num-green')
+    renderWatchlistChips(sys.watchlist_public),
+    systemInfoRow('Data status', safe(sys.data_status, 'Bình thường'), 'num-green'),
+    systemInfoRow('Cache', safe(sys.cache_status)),
+    systemInfoRow('Stale data', displayNormalBool(sys.stale_data), sys.stale_data ? 'num-red' : 'num-green'),
+    systemInfoRow('Đồng bộ dashboard', safe(sys.dashboard_sync, 'Bình thường'), 'num-green')
   ].join('');
 
   document.getElementById('positionsStatus').innerHTML = [
