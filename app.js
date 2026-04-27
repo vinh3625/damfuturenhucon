@@ -4,15 +4,27 @@ let selectedSignalIndex = 0;
 let activeLogFilter = 'all';
 let activeTradeJournalFilter = 'all';
 let eventsBound = false;
+let currentData = null;
 let previousMetricSnapshot = null;
 let changedMetrics = new Set();
 let liveStateTimer = null;
 let refreshInFlight = false;
+let realtimeSocket = null;
+let realtimeReconnectTimer = null;
+let realtimeReconnectAttempt = 0;
+let realtimeConnected = false;
+let fallbackPollTimer = null;
+let lastDataReceivedAt = null;
 
-const DASHBOARD_API_URL = 'https://bingx-dashboard-api.nguyenvanvinh030625.workers.dev/dashboard';
+const REALTIME_WORKER_URL = "https://bingx-dashboard-realtime.nguyenvanvinh030625.workers.dev";
+const DASHBOARD_API_URL = `${REALTIME_WORKER_URL}/dashboard`;
+const REALTIME_WS_URL = `${REALTIME_WORKER_URL.replace(/^http/, 'ws')}/ws`;
+const LEGACY_DASHBOARD_API_URL = 'https://bingx-dashboard-api.nguyenvanvinh030625.workers.dev/dashboard';
 const LOCAL_FALLBACK_URL = 'public_dashboard.json';
 const DEMO_DASHBOARD_URL = 'public_dashboard.demo.json';
 const DISPLAY_BRAND_NAME = '@damfuturenhucon';
+const FALLBACK_POLL_MS = 5000;
+const RECONNECT_DELAYS_MS = [1000, 2000, 3000, 5000, 10000];
 const isDemoMode = new URLSearchParams(window.location.search).get('demo') === '1'
   && ['localhost', '127.0.0.1'].includes(window.location.hostname);
 
@@ -106,24 +118,35 @@ function ensureFavicon() {
   document.head.appendChild(icon);
 }
 
+async function fetchDashboardJson(url, label) {
+  const res = await fetch(url, { cache: 'no-store' });
+  if (!res.ok) throw new Error(`${label} fetch failed: ${res.status}`);
+  return await res.json();
+}
+
+async function fetchRealtimeDashboard() {
+  return await fetchDashboardJson(DASHBOARD_API_URL, 'Realtime dashboard');
+}
+
 async function loadDashboardData() {
   if (isDemoMode) {
     console.info('[dashboard] Demo mode: using public_dashboard.demo.json');
-    const demo = await fetch(DEMO_DASHBOARD_URL, { cache: 'no-store' });
-    if (!demo.ok) throw new Error(`Demo dashboard fetch failed: ${demo.status}`);
-    return await demo.json();
+    return await fetchDashboardJson(DEMO_DASHBOARD_URL, 'Demo dashboard');
   }
 
   try {
-    const res = await fetch(DASHBOARD_API_URL, { cache: 'no-store' });
-    if (!res.ok) throw new Error(`Worker fetch failed: ${res.status}`);
-    return await res.json();
+    return await fetchRealtimeDashboard();
   } catch (err) {
-    console.warn('[dashboard] Worker fetch failed, using local fallback', err);
-    const fallback = await fetch(LOCAL_FALLBACK_URL, { cache: 'no-store' });
-    if (!fallback.ok) throw new Error(`Local fallback failed: ${fallback.status}`);
-    return await fallback.json();
+    console.warn('[dashboard] Realtime worker fetch failed, trying local fallback', err);
   }
+
+  try {
+    return await fetchDashboardJson(LOCAL_FALLBACK_URL, 'Local fallback');
+  } catch (err) {
+    console.warn('[dashboard] Local fallback failed, trying legacy worker as final fallback', err);
+  }
+
+  return await fetchDashboardJson(LEGACY_DASHBOARD_API_URL, 'Legacy dashboard');
 }
 
 function createMetricSnapshot(data) {
@@ -137,6 +160,8 @@ function setDashboardData(nextData) {
     : new Set();
   previousMetricSnapshot = nextSnapshot;
   dashboardData = nextData;
+  currentData = nextData;
+  lastDataReceivedAt = new Date().toISOString();
 }
 
 function markRefreshStart() {
@@ -176,6 +201,122 @@ async function loadData() {
   return refreshDashboard({ showError: true });
 }
 
+function applyRealtimeSnapshot(nextData) {
+  if (!nextData || typeof nextData !== 'object') return;
+  markRefreshStart();
+  setDashboardData(nextData);
+  renderAll();
+  markRefreshDone();
+}
+
+async function pollRealtimeDashboard() {
+  if (isDemoMode || realtimeConnected || refreshInFlight) return;
+  refreshInFlight = true;
+  markRefreshStart();
+  try {
+    setDashboardData(await fetchRealtimeDashboard());
+    renderAll();
+    markRefreshDone();
+  } catch (error) {
+    document.body.classList.remove('data-refreshing');
+    console.warn('[dashboard] Fallback realtime polling failed', error);
+  } finally {
+    refreshInFlight = false;
+  }
+}
+
+function startFallbackPolling() {
+  if (isDemoMode || fallbackPollTimer) return;
+  fallbackPollTimer = setInterval(pollRealtimeDashboard, FALLBACK_POLL_MS);
+}
+
+function stopFallbackPolling() {
+  clearInterval(fallbackPollTimer);
+  fallbackPollTimer = null;
+}
+
+function scheduleRealtimeReconnect(reason) {
+  if (isDemoMode || realtimeReconnectTimer || realtimeConnected) return;
+  const delay = RECONNECT_DELAYS_MS[Math.min(realtimeReconnectAttempt, RECONNECT_DELAYS_MS.length - 1)];
+  realtimeReconnectAttempt += 1;
+  console.warn(`[dashboard] WebSocket ${reason}; reconnecting in ${delay / 1000}s`);
+  realtimeReconnectTimer = setTimeout(() => {
+    realtimeReconnectTimer = null;
+    connectRealtimeWebSocket();
+  }, delay);
+}
+
+function handleRealtimeDisconnect(reason) {
+  realtimeConnected = false;
+  startFallbackPolling();
+  scheduleRealtimeReconnect(reason);
+  if (dashboardData) renderHeader();
+}
+
+function handleRealtimeMessage(event) {
+  let message;
+  try {
+    message = JSON.parse(event.data);
+  } catch (error) {
+    console.warn('[dashboard] Ignoring invalid WebSocket message', error);
+    return;
+  }
+
+  if (message?.type === 'snapshot' && message.data) {
+    applyRealtimeSnapshot(message.data);
+  }
+}
+
+function connectRealtimeWebSocket() {
+  if (isDemoMode) return;
+  if (!('WebSocket' in window)) {
+    console.warn('[dashboard] WebSocket is not available; using fallback polling');
+    startFallbackPolling();
+    return;
+  }
+  if (realtimeSocket && [WebSocket.CONNECTING, WebSocket.OPEN].includes(realtimeSocket.readyState)) return;
+
+  const socket = new WebSocket(REALTIME_WS_URL);
+  realtimeSocket = socket;
+
+  socket.addEventListener('open', () => {
+    if (socket !== realtimeSocket) return;
+    realtimeConnected = true;
+    realtimeReconnectAttempt = 0;
+    clearTimeout(realtimeReconnectTimer);
+    realtimeReconnectTimer = null;
+    stopFallbackPolling();
+    console.info('[dashboard] WebSocket connected');
+    if (dashboardData) renderHeader();
+  });
+
+  socket.addEventListener('message', event => {
+    if (socket !== realtimeSocket) return;
+    handleRealtimeMessage(event);
+  });
+
+  socket.addEventListener('error', () => {
+    if (socket !== realtimeSocket) return;
+    handleRealtimeDisconnect('error');
+    try {
+      socket.close();
+    } catch (error) {
+      console.warn('[dashboard] WebSocket close after error failed', error);
+    }
+  });
+
+  socket.addEventListener('close', () => {
+    if (socket !== realtimeSocket) return;
+    handleRealtimeDisconnect('closed');
+  });
+}
+
+function startRealtimeUpdates() {
+  if (isDemoMode) return;
+  connectRealtimeWebSocket();
+  startFallbackPolling();
+}
+
 function kpiCard(icon, label, value, sub, negative = false, metricKeys = []) {
   const keys = Array.isArray(metricKeys) ? metricKeys : metricKeys ? [metricKeys] : [];
   const changed = keys.some(key => changedMetrics.has(key));
@@ -188,10 +329,11 @@ function kpiCard(icon, label, value, sub, negative = false, metricKeys = []) {
 
 function renderHeader() {
   const bot = dashboardData.bot || {};
+  const realtime = dashboardData.realtime || {};
   document.title = DISPLAY_BRAND_NAME;
   document.querySelector('h1').textContent = DISPLAY_BRAND_NAME;
   document.getElementById('botStatusText').textContent = 'Online';
-  const updatedAt = dashboardData.cloudflare_published_at || bot.updated_at;
+  const updatedAt = firstValue(realtime.updated_at, bot.updated_at, lastDataReceivedAt, dashboardData.cloudflare_published_at);
   document.getElementById('updatedAt').textContent = freshnessText(updatedAt);
 }
 
@@ -1209,7 +1351,13 @@ function renderAll() {
 }
 
 ensureFavicon();
-loadData();
+loadData()
+  .then(() => {
+    startRealtimeUpdates();
+  })
+  .catch(error => {
+    console.error('[dashboard] Initial load failed', error);
+  });
 setInterval(() => {
-  refreshDashboard();
+  if (dashboardData) renderHeader();
 }, 30000);
