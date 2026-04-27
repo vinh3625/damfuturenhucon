@@ -267,22 +267,23 @@ function ensureTradeJournalLayout() {
   if (document.getElementById('tradeJournalBody') && document.getElementById('journalQuickStats')) return;
 
   logs.innerHTML = `
-    <div class="journal-card-head">
-      <div class="panel-title">Nhật ký giao dịch</div>
-      <div class="journal-filter" aria-label="Lọc nhật ký giao dịch">
-        ${[
-          ['all', 'Tất cả'],
-          ['running', 'Đang chạy'],
-          ['closed', 'Đã đóng'],
-          ['tp', 'TP'],
-          ['sl', 'SL'],
-          ['long', 'LONG'],
-          ['short', 'SHORT']
-        ].map(([value, label], index) => `<button class="log-pill journal-pill ${index === 0 ? 'active' : ''}" data-journal="${value}">${label}</button>`).join('')}
-      </div>
-    </div>
     <div class="journal-stats-grid" id="journalQuickStats"></div>
     <section class="panel trade-journal-panel">
+      <div class="journal-card-head">
+        <div class="panel-title">Nhật ký giao dịch</div>
+        <div class="journal-filter" aria-label="Lọc nhật ký giao dịch">
+          ${[
+            ['all', 'Tất cả'],
+            ['running', 'Đang chạy'],
+            ['closed', 'Đã đóng'],
+            ['long', 'LONG'],
+            ['short', 'SHORT'],
+            ['sl', 'SL'],
+            ['tp1', 'TP1'],
+            ['tp2', 'TP2']
+          ].map(([value, label], index) => `<button class="log-pill journal-pill ${index === 0 ? 'active' : ''}" data-journal="${value}">${label}</button>`).join('')}
+        </div>
+      </div>
       <div class="table-wrap trade-journal-wrap">
         <table class="trade-journal-table">
           <thead><tr><th>Thời gian</th><th>Cặp</th><th>Hướng</th><th>Khung</th><th>Entry</th><th>SL</th><th>TP1</th><th>TP2</th><th>Giá trị lệnh</th><th>Trạng thái</th><th>Kết quả</th></tr></thead>
@@ -804,7 +805,7 @@ function fallbackJournalRows() {
 
 function tradeJournalRows() {
   const journal = arr(dashboardData.trade_journal);
-  return (journal.length ? journal : fallbackJournalRows()).map(row => normalizeJournalRow(row));
+  return journal.map(row => normalizeJournalRow(row));
 }
 
 function matchesTradeJournalFilter(row) {
@@ -814,10 +815,11 @@ function matchesTradeJournalFilter(row) {
 
   if (activeTradeJournalFilter === 'running') return status.includes('đang chạy') || status.includes('active') || status.includes('running');
   if (activeTradeJournalFilter === 'closed') return status.includes('đã đóng') || status.includes('closed');
-  if (activeTradeJournalFilter === 'tp') return /\bTP(?:1|2)?\b/.test(result);
-  if (activeTradeJournalFilter === 'sl') return /\bSL\b/.test(result) || result.includes('STOP LOSS');
   if (activeTradeJournalFilter === 'long') return direction === 'LONG';
   if (activeTradeJournalFilter === 'short') return direction === 'SHORT';
+  if (activeTradeJournalFilter === 'sl') return result.includes('SL') || result.includes('STOP LOSS');
+  if (activeTradeJournalFilter === 'tp1') return result.includes('TP1');
+  if (activeTradeJournalFilter === 'tp2') return result.includes('TP2');
   return true;
 }
 

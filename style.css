@@ -196,21 +196,26 @@ label { color: #b5c1c4; display: flex; align-items: center; gap: 8px; }
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 16px;
   margin-bottom: 12px;
   min-width: 0;
 }
 .journal-card-head .panel-title {
+  flex: 0 0 auto;
   margin-bottom: 0;
 }
 .journal-filter {
   display: flex;
   align-items: center;
   justify-content: flex-end;
+  flex: 1 1 520px;
   flex-wrap: wrap;
   gap: 8px;
+  min-width: 0;
 }
 .journal-filter .log-pill {
+  flex: 0 0 auto;
   padding: 8px 14px;
 }
 .journal-stats-grid {
