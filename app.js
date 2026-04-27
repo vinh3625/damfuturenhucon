@@ -3,6 +3,7 @@ let activeSignalFilter = 'all';
 let selectedSignalIndex = 0;
 let activeLogFilter = 'all';
 let activeTradeJournalFilter = 'all';
+let selectedTradeJournalIndex = 0;
 let eventsBound = false;
 let previousMetricSnapshot = null;
 let changedMetrics = new Set();
@@ -264,55 +265,47 @@ function ensureSystemTab() {
 function ensureTradeJournalLayout() {
   const logs = document.getElementById('tab-logs');
   if (!logs) return;
+  if (document.getElementById('tradeJournalBody') && document.getElementById('tradeJournalDetail')) return;
 
-  const title = logs.querySelector('.page-title');
-  if (title) title.textContent = '📋 Nhật ký giao dịch';
-  const description = logs.querySelector('.page-head p');
-  if (description) description.textContent = 'Theo dõi lịch sử tín hiệu, lệnh đang chạy và kết quả giao dịch.';
-
-  const filter = logs.querySelector('.log-filter');
-  if (filter && !filter.classList.contains('journal-filter')) {
-    filter.className = 'filter-bar log-filter journal-filter';
-    filter.innerHTML = [
-      ['all', 'Tất cả'],
-      ['running', 'Đang chạy'],
-      ['closed', 'Đã đóng'],
-      ['tp', 'TP'],
-      ['sl', 'SL'],
-      ['long', 'LONG'],
-      ['short', 'SHORT']
-    ].map(([value, label], index) => `<button class="log-pill journal-pill ${index === 0 ? 'active' : ''}" data-journal="${value}">${label}</button>`).join('');
-  }
-
-  const layout = logs.querySelector('.logs-layout');
-  if (layout && !layout.classList.contains('trade-journal-layout')) {
-    layout.className = 'logs-layout trade-journal-layout';
-    layout.innerHTML = `
-      <section class="panel trade-journal-panel">
-        <div class="table-wrap trade-journal-wrap">
-          <table class="trade-journal-table">
-            <thead><tr><th>Thời gian</th><th>Cặp</th><th>Hướng</th><th>Khung</th><th>Entry</th><th>SL</th><th>TP1</th><th>TP2</th><th>Giá trị lệnh</th><th>Trạng thái</th><th>Kết quả</th></tr></thead>
-            <tbody id="tradeJournalBody"></tbody>
-          </table>
+  logs.innerHTML = `
+    <section class="panel trade-journal-panel">
+      <div class="journal-card-head">
+        <div class="panel-title">Nhật ký giao dịch</div>
+        <div class="journal-filter" aria-label="Lọc nhật ký giao dịch">
+          ${[
+            ['all', 'Tất cả'],
+            ['running', 'Đang chạy'],
+            ['closed', 'Đã đóng'],
+            ['tp', 'TP'],
+            ['sl', 'SL'],
+            ['long', 'LONG'],
+            ['short', 'SHORT']
+          ].map(([value, label], index) => `<button class="log-pill journal-pill ${index === 0 ? 'active' : ''}" data-journal="${value}">${label}</button>`).join('')}
         </div>
-      </section>
-      <aside class="side-stack journal-side-stack">
-        <section class="panel" id="dailyHighlights"></section>
-      </aside>`;
-  }
+      </div>
+      <div class="table-wrap trade-journal-wrap">
+        <table class="trade-journal-table">
+          <thead><tr><th>Thời gian</th><th>Cặp</th><th>Hướng</th><th>Khung</th><th>Entry</th><th>SL</th><th>TP1</th><th>TP2</th><th>Giá trị lệnh</th><th>Trạng thái</th><th>Kết quả</th></tr></thead>
+          <tbody id="tradeJournalBody"></tbody>
+        </table>
+      </div>
+    </section>
 
-  if (!document.getElementById('journalSystemLogsBody')) {
-    logs.insertAdjacentHTML('beforeend', `
+    <div class="journal-lower-grid">
       <section class="panel journal-system-panel">
-        <div class="panel-title">🧾 Nhật ký hệ thống gần đây</div>
+        <div class="panel-title">Nhật ký hệ thống gần đây</div>
         <div class="table-wrap">
           <table class="journal-system-table">
             <thead><tr><th>Thời gian</th><th>Loại</th><th>Sự kiện</th></tr></thead>
             <tbody id="journalSystemLogsBody"></tbody>
           </table>
         </div>
-      </section>`);
-  }
+      </section>
+      <aside class="panel trade-detail-panel">
+        <div class="panel-title">Chi tiết giao dịch</div>
+        <div id="tradeJournalDetail" class="trade-detail-list"></div>
+      </aside>
+    </div>`;
 }
 
 function renderHome() {
@@ -757,8 +750,6 @@ function renderLogs() {
   renderTradeJournal();
   renderJournalSystemLogs();
   hideLogSystemSummary();
-  const d = dailyHighlightCounts();
-  document.getElementById('dailyHighlights').innerHTML = `<div class="panel-title">☆ Sự kiện nổi bật hôm nay</div>${eventCard('＋','Tín hiệu được tạo',d.signals_created)}${eventCard('↪','Lệnh đã vào',d.entries_executed)}${eventCard('◎','TP hit',d.tp_hit)}${eventCard('✕','SL hit',d.sl_hit, true)}`;
 }
 
 function eventCard(icon, label, value, red=false) { return `<div class="event-card"><span class="kpi-icon" style="width:40px;height:40px;font-size:18px">${icon}</span><span>${label}</span><strong class="${red?'num-red':'num-green'}" style="font-size:24px">${safeNumber(value)}</strong></div>`; }
@@ -876,12 +867,13 @@ function renderTradeJournal() {
   });
 
   const rows = tradeJournalRows().filter(matchesTradeJournalFilter);
+  if (selectedTradeJournalIndex >= rows.length) selectedTradeJournalIndex = 0;
   target.innerHTML = rows.length
-    ? rows.map(row => {
+    ? rows.map((row, index) => {
       const direction = safe(row.direction);
       const directionClass = direction === 'LONG' ? 'long' : direction === 'SHORT' ? 'short' : 'info';
       const result = safe(row.result);
-      return `<tr>
+      return `<tr class="${index === selectedTradeJournalIndex ? 'selected' : ''}" data-journal-index="${index}">
         <td class="journal-time">${formatSystemDateTime(row.time)}</td>
         <td><strong>${safe(row.symbol)}</strong></td>
         <td><span class="badge ${directionClass}">${direction}</span></td>
@@ -896,6 +888,43 @@ function renderTradeJournal() {
       </tr>`;
     }).join('')
     : '<tr><td colspan="11" class="empty-state">Chưa có nhật ký giao dịch.</td></tr>';
+  renderTradeJournalDetail(rows[selectedTradeJournalIndex]);
+  target.querySelectorAll('tr[data-journal-index]').forEach(row => {
+    row.addEventListener('click', () => {
+      selectedTradeJournalIndex = Number(row.dataset.journalIndex) || 0;
+      renderTradeJournal();
+    });
+  });
+}
+
+function tradeDetailRow(label, value, cls = '') {
+  return `<div class="trade-detail-row"><span>${label}</span><strong class="${cls}">${safe(value)}</strong></div>`;
+}
+
+function renderTradeJournalDetail(row) {
+  const target = document.getElementById('tradeJournalDetail');
+  if (!target) return;
+  if (!row) {
+    target.innerHTML = '<div class="empty-state">Chưa có giao dịch được chọn.</div>';
+    return;
+  }
+
+  const direction = safe(row.direction);
+  const directionClass = direction === 'LONG' ? 'long' : direction === 'SHORT' ? 'short' : 'info';
+  const result = safe(row.result);
+  target.innerHTML = [
+    tradeDetailRow('Cặp', safe(row.symbol)),
+    tradeDetailRow('Hướng', `<span class="badge ${directionClass}">${direction}</span>`),
+    tradeDetailRow('Khung', safe(row.timeframe)),
+    tradeDetailRow('Entry', formatTradeNumber(row.entry)),
+    tradeDetailRow('Stop Loss', formatTradeNumber(row.sl), 'num-red'),
+    tradeDetailRow('Take Profit 1', formatTradeNumber(row.tp1), 'num-cyan'),
+    tradeDetailRow('Take Profit 2', formatTradeNumber(row.tp2), 'num-green'),
+    tradeDetailRow('Giá trị lệnh', formatPositionValue(row.position_value)),
+    tradeDetailRow('Trạng thái', `<span class="badge ${statusClass(row.status)}">${safe(row.status)}</span>`),
+    tradeDetailRow('Kết quả', result, journalResultClass(result)),
+    tradeDetailRow('Thời gian', formatSystemDateTime(row.time), 'num-cyan')
+  ].join('');
 }
 
 function systemJournalRows() {
@@ -1183,6 +1212,7 @@ function bindEvents() {
     button.classList.add('active');
     if (button.classList.contains('journal-pill')) {
       activeTradeJournalFilter = button.dataset.journal || 'all';
+      selectedTradeJournalIndex = 0;
       renderTradeJournal();
     } else {
       activeLogFilter = logFilterValue(button.dataset.log);
