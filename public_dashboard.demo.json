@@ -163,6 +163,99 @@
       "r": 0.25
     }
   ],
+  "trade_journal": [
+    {
+      "time": "2026-04-27T13:46:13+00:00",
+      "symbol": "BTCUSDT",
+      "direction": "LONG",
+      "timeframe": "M5",
+      "entry": 64850,
+      "sl": 64180,
+      "tp1": 65520,
+      "tp2": 66240,
+      "position_value": "1250 USDT",
+      "status": "Đang chạy",
+      "result": "--"
+    },
+    {
+      "time": "2026-04-27T13:22:13+00:00",
+      "symbol": "ETHUSDT",
+      "direction": "SHORT",
+      "timeframe": "M15",
+      "entry": 3240,
+      "sl": 3295,
+      "tp1": 3188,
+      "tp2": 3125,
+      "position_value": "980 USDT",
+      "status": "Đang chạy",
+      "result": "--"
+    },
+    {
+      "time": "2026-04-27T12:44:13+00:00",
+      "symbol": "SOLUSDT",
+      "direction": "LONG",
+      "timeframe": "H1",
+      "entry": 147.4,
+      "sl": 142.8,
+      "tp1": 152.2,
+      "tp2": 158.6,
+      "position_value": "720 USDT",
+      "status": "Chờ xác nhận",
+      "result": "--"
+    },
+    {
+      "time": "2026-04-26T22:18:13+00:00",
+      "symbol": "XRPUSDT",
+      "direction": "LONG",
+      "timeframe": "M5",
+      "entry": 0.5482,
+      "sl": 0.539,
+      "tp1": 0.558,
+      "tp2": 0.5695,
+      "position_value": "450 USDT",
+      "status": "Đã đóng",
+      "result": "TP1 HIT"
+    },
+    {
+      "time": "2026-04-26T20:12:13+00:00",
+      "symbol": "ADAUSDT",
+      "direction": "SHORT",
+      "timeframe": "H1",
+      "entry": 0.462,
+      "sl": 0.471,
+      "tp1": 0.451,
+      "tp2": 0.438,
+      "position_value": "520 USDT",
+      "status": "Đã đóng",
+      "result": "TP2 HIT"
+    },
+    {
+      "time": "2026-04-25T17:02:13+00:00",
+      "symbol": "BNBUSDT",
+      "direction": "LONG",
+      "timeframe": "M15",
+      "entry": 612.8,
+      "sl": 604.2,
+      "tp1": 621.4,
+      "tp2": 631.8,
+      "position_value": "860 USDT",
+      "status": "Đã đóng",
+      "result": "SL"
+    },
+    {
+      "time": "2026-04-25T10:45:13+00:00",
+      "symbol": "LINKUSDT",
+      "direction": "SHORT",
+      "timeframe": "M15",
+      "entry": 14.82,
+      "sl": 15.08,
+      "tp1": 14.52,
+      "tp2": 14.16,
+      "position_value": "610 USDT",
+      "status": "Đã đóng",
+      "result": "Thoát sớm"
+    }
+  ],
   "activity_logs": [
     {
       "time": "13:46",
@@ -268,11 +361,11 @@
     "pending_signals": 1,
     "closed_today": 1,
     "daily_loss_count": 1,
-    "last_reset_at": "2026-04-27T00:00:00+00:00",
+    "last_reset_at": "",
     "last_dashboard_publish": "2026-04-27T13:58:13+00:00",
     "recent_system_logs": [
       {
-        "time": "2026-04-27T13:46:13+00:00",
+        "time": "13:46",
         "message": "BTCUSDT LONG - Đang chạy",
         "type": "SIGNAL"
       },

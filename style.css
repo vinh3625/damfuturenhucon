@@ -191,6 +191,33 @@ label { color: #b5c1c4; display: flex; align-items: center; gap: 8px; }
 .log-table-head { display:grid; grid-template-columns: 120px 150px 1fr; gap: 20px; padding: 0 12px 13px; color:#c8d2d5; border-bottom: 1px solid rgba(255,255,255,.12); }
 .log-table .timeline-row { grid-template-columns: 120px 150px 1fr; padding: 10px 12px; }
 .log-type { font-weight: 850; }
+.trade-journal-layout { grid-template-columns: minmax(0, 1fr) minmax(260px, 300px); align-items: start; }
+.trade-journal-panel { min-width: 0; }
+.trade-journal-wrap { max-width: 100%; overflow-x: auto; }
+.trade-journal-table { min-width: 1180px; }
+.trade-journal-table th,
+.trade-journal-table td,
+.journal-system-table th,
+.journal-system-table td {
+  white-space: nowrap;
+}
+.trade-journal-table td:last-child,
+.journal-system-table td:last-child {
+  white-space: normal;
+}
+.journal-time {
+  color: var(--cyan);
+  font-weight: 800;
+}
+.journal-system-panel {
+  margin-top: 16px;
+}
+.journal-system-table {
+  min-width: 680px;
+}
+.muted-text {
+  color: var(--muted);
+}
 .side-stack { display:grid; gap: 14px; align-content:start; }
 .system-row { display:grid; grid-template-columns: 1fr auto; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,.08); }
 .event-card { display:grid; grid-template-columns: 44px 1fr auto; align-items:center; gap: 10px; padding: 12px; border: 1px solid rgba(255,255,255,.09); border-radius: 10px; margin-bottom: 9px; }

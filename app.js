@@ -2,6 +2,7 @@ let dashboardData = null;
 let activeSignalFilter = 'all';
 let selectedSignalIndex = 0;
 let activeLogFilter = 'all';
+let activeTradeJournalFilter = 'all';
 let eventsBound = false;
 let previousMetricSnapshot = null;
 let changedMetrics = new Set();
@@ -256,6 +257,60 @@ function ensureSystemTab() {
           <div class="panel-title">🧾 Nhật ký hệ thống gần đây</div>
           <div class="system-log-list" id="recentSystemLogs"></div>
         </section>
+      </section>`);
+  }
+}
+
+function ensureTradeJournalLayout() {
+  const logs = document.getElementById('tab-logs');
+  if (!logs) return;
+
+  const title = logs.querySelector('.page-title');
+  if (title) title.textContent = '📋 Nhật ký giao dịch';
+  const description = logs.querySelector('.page-head p');
+  if (description) description.textContent = 'Theo dõi lịch sử tín hiệu, lệnh đang chạy và kết quả giao dịch.';
+
+  const filter = logs.querySelector('.log-filter');
+  if (filter && !filter.classList.contains('journal-filter')) {
+    filter.className = 'filter-bar log-filter journal-filter';
+    filter.innerHTML = [
+      ['all', 'Tất cả'],
+      ['running', 'Đang chạy'],
+      ['closed', 'Đã đóng'],
+      ['tp', 'TP'],
+      ['sl', 'SL'],
+      ['long', 'LONG'],
+      ['short', 'SHORT']
+    ].map(([value, label], index) => `<button class="log-pill journal-pill ${index === 0 ? 'active' : ''}" data-journal="${value}">${label}</button>`).join('');
+  }
+
+  const layout = logs.querySelector('.logs-layout');
+  if (layout && !layout.classList.contains('trade-journal-layout')) {
+    layout.className = 'logs-layout trade-journal-layout';
+    layout.innerHTML = `
+      <section class="panel trade-journal-panel">
+        <div class="table-wrap trade-journal-wrap">
+          <table class="trade-journal-table">
+            <thead><tr><th>Thời gian</th><th>Cặp</th><th>Hướng</th><th>Khung</th><th>Entry</th><th>SL</th><th>TP1</th><th>TP2</th><th>Giá trị lệnh</th><th>Trạng thái</th><th>Kết quả</th></tr></thead>
+            <tbody id="tradeJournalBody"></tbody>
+          </table>
+        </div>
+      </section>
+      <aside class="side-stack journal-side-stack">
+        <section class="panel" id="dailyHighlights"></section>
+      </aside>`;
+  }
+
+  if (!document.getElementById('journalSystemLogsBody')) {
+    logs.insertAdjacentHTML('beforeend', `
+      <section class="panel journal-system-panel">
+        <div class="panel-title">🧾 Nhật ký hệ thống gần đây</div>
+        <div class="table-wrap">
+          <table class="journal-system-table">
+            <thead><tr><th>Thời gian</th><th>Loại</th><th>Sự kiện</th></tr></thead>
+            <tbody id="journalSystemLogsBody"></tbody>
+          </table>
+        </div>
       </section>`);
   }
 }
@@ -698,13 +753,188 @@ function renderDistribution(targetId = 'distribution') {
 }
 
 function renderLogs() {
-  renderActivityLogs();
+  ensureTradeJournalLayout();
+  renderTradeJournal();
+  renderJournalSystemLogs();
   hideLogSystemSummary();
-  const d = dashboardData.daily_events || {};
+  const d = dailyHighlightCounts();
   document.getElementById('dailyHighlights').innerHTML = `<div class="panel-title">☆ Sự kiện nổi bật hôm nay</div>${eventCard('＋','Tín hiệu được tạo',d.signals_created)}${eventCard('↪','Lệnh đã vào',d.entries_executed)}${eventCard('◎','TP hit',d.tp_hit)}${eventCard('✕','SL hit',d.sl_hit, true)}`;
 }
 
 function eventCard(icon, label, value, red=false) { return `<div class="event-card"><span class="kpi-icon" style="width:40px;height:40px;font-size:18px">${icon}</span><span>${label}</span><strong class="${red?'num-red':'num-green'}" style="font-size:24px">${safeNumber(value)}</strong></div>`; }
+
+function firstValue(...values) {
+  return values.find(value => value !== undefined && value !== null && value !== '');
+}
+
+function journalResultFromStatus(status) {
+  const text = safeStatus(status);
+  const outcome = normalizeOutcomeLabel(text);
+  if (outcome) return outcome;
+  return text.includes('Thoát') ? 'Thoát sớm' : '';
+}
+
+function normalizeJournalRow(row = {}, fallback = {}) {
+  const status = firstValue(row.status, fallback.status, row.result ? 'Đã đóng' : '');
+  return {
+    time: firstValue(row.time, row.created_at, row.created_at_iso, row.opened_at, row.closed_at, row.updated_at, fallback.time),
+    symbol: firstValue(row.symbol, fallback.symbol),
+    direction: safeStatus(firstValue(row.direction, fallback.direction)).toUpperCase(),
+    timeframe: firstValue(row.timeframe, row.tf, row.frame, fallback.timeframe),
+    entry: firstValue(row.entry, fallback.entry),
+    sl: firstValue(row.sl, row.stop_loss, fallback.sl),
+    tp1: firstValue(row.tp1, fallback.tp1),
+    tp2: firstValue(row.tp2, fallback.tp2),
+    position_value: firstValue(row.position_value, row.positionValue, row.order_value, row.value, fallback.position_value),
+    status,
+    result: firstValue(row.result, row.outcome, row.pnl_result, journalResultFromStatus(status), fallback.result)
+  };
+}
+
+function fallbackJournalRows() {
+  const rows = [];
+  const latest = dashboardData.latest_signal || {};
+
+  arr(dashboardData.active_trades).forEach(trade => {
+    rows.push(normalizeJournalRow(trade, {
+      time: trade.time || trade.created_at || latest.created_at,
+      timeframe: trade.timeframe || latest.timeframe,
+      status: trade.status || 'Đang chạy'
+    }));
+  });
+
+  arr(dashboardData.signals).forEach(signal => {
+    rows.push(normalizeJournalRow(signal, {
+      status: signal.status,
+      result: journalResultFromStatus(signal.status)
+    }));
+  });
+
+  arr(dashboardData.recent_results).forEach(result => {
+    rows.push(normalizeJournalRow(result, {
+      status: 'Đã đóng',
+      result: result.result
+    }));
+  });
+
+  if (!rows.length && latest.symbol && !safeStatus(latest.status).includes('Chưa có tín hiệu')) {
+    rows.push(normalizeJournalRow(latest, {
+      status: latest.status,
+      result: journalResultFromStatus(latest.status)
+    }));
+  }
+
+  return rows;
+}
+
+function tradeJournalRows() {
+  const journal = arr(dashboardData.trade_journal);
+  return (journal.length ? journal : fallbackJournalRows()).map(row => normalizeJournalRow(row));
+}
+
+function matchesTradeJournalFilter(row) {
+  const status = safeStatus(row.status).toLowerCase();
+  const result = safeStatus(row.result).toUpperCase();
+  const direction = safeStatus(row.direction).toUpperCase();
+
+  if (activeTradeJournalFilter === 'running') return status.includes('đang chạy') || status.includes('active') || status.includes('running');
+  if (activeTradeJournalFilter === 'closed') return status.includes('đã đóng') || status.includes('closed') || !!normalizeOutcomeLabel(result);
+  if (activeTradeJournalFilter === 'tp') return /\bTP(?:1|2)?\b/.test(result);
+  if (activeTradeJournalFilter === 'sl') return /\bSL\b/.test(result) || result.includes('STOP LOSS');
+  if (activeTradeJournalFilter === 'long') return direction === 'LONG';
+  if (activeTradeJournalFilter === 'short') return direction === 'SHORT';
+  return true;
+}
+
+function formatTradeNumber(value) {
+  if (value === undefined || value === null || value === '') return '--';
+  const number = Number(value);
+  if (!Number.isFinite(number)) return safe(value);
+  const decimals = Math.abs(number) >= 100 ? 2 : Math.abs(number) >= 1 ? 4 : 6;
+  return number.toFixed(decimals).replace(/\.?0+$/, '');
+}
+
+function formatPositionValue(value) {
+  if (value === undefined || value === null || value === '') return '--';
+  const number = Number(value);
+  return Number.isFinite(number) ? `${formatTradeNumber(number)} USDT` : safe(value);
+}
+
+function journalResultClass(result) {
+  const text = safeStatus(result).toUpperCase();
+  if (text.includes('SL')) return 'num-red';
+  if (text.includes('TP')) return 'num-green';
+  return 'muted-text';
+}
+
+function renderTradeJournal() {
+  const target = document.getElementById('tradeJournalBody');
+  if (!target) return;
+
+  document.querySelectorAll('.journal-pill').forEach(button => {
+    button.classList.toggle('active', button.dataset.journal === activeTradeJournalFilter);
+  });
+
+  const rows = tradeJournalRows().filter(matchesTradeJournalFilter);
+  target.innerHTML = rows.length
+    ? rows.map(row => {
+      const direction = safe(row.direction);
+      const directionClass = direction === 'LONG' ? 'long' : direction === 'SHORT' ? 'short' : 'info';
+      const result = safe(row.result);
+      return `<tr>
+        <td class="journal-time">${formatSystemDateTime(row.time)}</td>
+        <td><strong>${safe(row.symbol)}</strong></td>
+        <td><span class="badge ${directionClass}">${direction}</span></td>
+        <td>${safe(row.timeframe)}</td>
+        <td>${formatTradeNumber(row.entry)}</td>
+        <td class="num-red">${formatTradeNumber(row.sl)}</td>
+        <td class="num-cyan">${formatTradeNumber(row.tp1)}</td>
+        <td class="num-green">${formatTradeNumber(row.tp2)}</td>
+        <td>${formatPositionValue(row.position_value)}</td>
+        <td><span class="badge ${statusClass(row.status)}">${safe(row.status)}</span></td>
+        <td><strong class="${journalResultClass(result)}">${result}</strong></td>
+      </tr>`;
+    }).join('')
+    : '<tr><td colspan="11" class="empty-state">Chưa có nhật ký giao dịch.</td></tr>';
+}
+
+function systemJournalRows() {
+  const logs = arr(dashboardData.system?.recent_system_logs);
+  return (logs.length ? logs : arr(dashboardData.activity_logs)).slice(0, 10);
+}
+
+function renderJournalSystemLogs() {
+  const target = document.getElementById('journalSystemLogsBody');
+  if (!target) return;
+  const rows = systemJournalRows();
+  target.innerHTML = rows.length
+    ? rows.map(log => `<tr><td class="journal-time">${formatSystemDateTime(log.time || log.created_at)}</td><td><span class="log-type">${safe(log.type, 'SYSTEM').toUpperCase()}</span></td><td>${highlightMessage(safeStatus(log.message || log.event || log.text).slice(0, 180))}</td></tr>`).join('')
+    : '<tr><td colspan="3" class="empty-state">Chưa có nhật ký hệ thống.</td></tr>';
+}
+
+function dailyHighlightCounts() {
+  const journalRows = tradeJournalRows();
+  if (journalRows.length) {
+    return {
+      signals_created: journalRows.length,
+      entries_executed: journalRows.filter(row => row.entry !== undefined && row.entry !== null && row.entry !== '').length,
+      tp_hit: journalRows.filter(row => /\bTP(?:1|2)?\b/.test(safeStatus(row.result).toUpperCase())).length,
+      sl_hit: journalRows.filter(row => /\bSL\b/.test(safeStatus(row.result).toUpperCase())).length
+    };
+  }
+
+  const logs = arr(dashboardData.activity_logs);
+  if (logs.length) {
+    return {
+      signals_created: logs.filter(log => /SIGNAL|Tín hiệu/i.test(safeStatus(log.type) + safeStatus(log.message))).length,
+      entries_executed: logs.filter(log => /Vào lệnh|entry|entered/i.test(safeStatus(log.type) + safeStatus(log.message))).length,
+      tp_hit: logs.filter(log => /\bTP(?:1|2)?\b/i.test(safeStatus(log.message))).length,
+      sl_hit: logs.filter(log => /\bSL\b/i.test(safeStatus(log.message))).length
+    };
+  }
+
+  return dashboardData.daily_events || {};
+}
 
 function renderSystemSummary() {
   const sys = dashboardData.system || {};
@@ -951,14 +1181,20 @@ function bindEvents() {
   document.querySelectorAll('.log-pill').forEach(button => button.addEventListener('click', () => {
     document.querySelectorAll('.log-pill').forEach(b => b.classList.remove('active'));
     button.classList.add('active');
-    activeLogFilter = logFilterValue(button.dataset.log);
-    renderActivityLogs();
+    if (button.classList.contains('journal-pill')) {
+      activeTradeJournalFilter = button.dataset.journal || 'all';
+      renderTradeJournal();
+    } else {
+      activeLogFilter = logFilterValue(button.dataset.log);
+      renderActivityLogs();
+    }
   }));
   document.getElementById('logSearch')?.addEventListener('input', renderActivityLogs);
 }
 
 function renderAll() {
   ensureSystemTab();
+  ensureTradeJournalLayout();
   bindEvents();
   renderHeader();
   renderHome();
