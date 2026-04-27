@@ -175,21 +175,13 @@ async function loadData() {
   return refreshDashboard({ showError: true });
 }
 
-function sparkSvg(points = [4,8,6,12,11,17,14,22]) {
-  const max = Math.max(...points), min = Math.min(...points);
-  const step = 100 / (points.length - 1);
-  const coords = points.map((p, i) => `${i * step},${38 - ((p - min) / Math.max(1, max - min)) * 32}`).join(' ');
-  return `<svg class="spark" viewBox="0 0 100 40" preserveAspectRatio="none"><path d="M ${coords.replaceAll(' ', ' L ')}" /></svg>`;
-}
-
 function kpiCard(icon, label, value, sub, negative = false, metricKeys = []) {
   const keys = Array.isArray(metricKeys) ? metricKeys : metricKeys ? [metricKeys] : [];
   const changed = keys.some(key => changedMetrics.has(key));
   const metricAttr = keys.length ? ` data-metric="${keys[0]}"` : '';
   return `<article class="kpi-card ${changed ? 'value-updated' : ''}"${metricAttr}>
     <div class="kpi-icon">${icon}</div>
-    <div><div class="kpi-label">${label}</div><div class="kpi-value ${negative ? 'num-red' : ''} ${changed ? 'value-flash' : ''}">${value}</div><div class="kpi-sub">${sub}</div></div>
-    ${sparkSvg(negative ? [22,20,18,19,14,12,9,8] : [4,6,5,10,8,14,12,18,16,22])}
+    <div class="kpi-content"><div class="kpi-label">${label}</div><div class="kpi-value ${negative ? 'num-red' : ''} ${changed ? 'value-flash' : ''}">${value}</div><div class="kpi-sub">${sub}</div></div>
   </article>`;
 }
 
@@ -411,7 +403,7 @@ function signalDistributionItems() {
   return [
     { label: 'SL', count: outcomes.SL, color: 'var(--red)', cls: 'num-red' },
     { label: 'TP1', count: outcomes.TP1, color: 'var(--cyan)', cls: 'num-cyan' },
-    { label: 'TP2', count: outcomes.TP2, color: 'rgba(72, 168, 255, .95)', cls: 'num-cyan' }
+    { label: 'TP2', count: outcomes.TP2, color: 'var(--green)', cls: 'num-green' }
   ];
 }
 
@@ -752,6 +744,28 @@ function shortErrorText(value) {
   return text.split('\n')[0].replace(/\s{2,}/g, ' ').slice(0, 180);
 }
 
+function formatSystemDateTime(value) {
+  if (value === undefined || value === null) return '--';
+  const raw = safeStatus(value).trim();
+  if (!raw || raw === '--') return '--';
+
+  const isoMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})[T\s](\d{2}):(\d{2})(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?$/);
+  if (isoMatch) return `${isoMatch[3]}/${isoMatch[2]}/${isoMatch[1]} ${isoMatch[4]}:${isoMatch[5]}`;
+
+  if (typeof value === 'number' || /^\d{10,13}$/.test(raw)) {
+    const numeric = Number(value);
+    if (Number.isFinite(numeric)) {
+      const date = new Date(numeric < 1e12 ? numeric * 1000 : numeric);
+      if (!Number.isNaN(date.getTime())) {
+        const pad = part => String(part).padStart(2, '0');
+        return `${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${date.getFullYear()} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+      }
+    }
+  }
+
+  return safe(value);
+}
+
 function systemScanRows() {
   const sys = dashboardData.system || {};
   const source = sys.scan_timeframes;
@@ -844,8 +858,8 @@ function renderSystemTab() {
   document.getElementById('systemScanBody').innerHTML = systemScanRows().map(row => `<tr>
     <td><strong>${safe(row.timeframe)}</strong></td>
     <td>${safe(row.role)}</td>
-    <td class="num-cyan">${safe(row.last_scan)}</td>
-    <td>${safe(row.next_scan)}</td>
+    <td class="num-cyan">${formatSystemDateTime(row.last_scan)}</td>
+    <td>${formatSystemDateTime(row.next_scan)}</td>
     <td><span class="badge info">${safe(row.status, 'Chờ nến đóng')}</span></td>
   </tr>`).join('');
 
@@ -869,7 +883,7 @@ function renderSystemTab() {
     systemListRow('Execution mode', safe(sys.execution_mode_public)),
     systemListRow('Send group calls', displayBool(sys.send_group_calls)),
     systemListRow('Send admin reports', displayBool(sys.send_admin_reports)),
-    systemListRow('Lần reset gần nhất', safe(sys.last_reset_at))
+    systemListRow('Lần reset gần nhất', formatSystemDateTime(sys.last_reset_at))
   ].join('');
 
   const errorText = shortErrorText(sys.last_error);
@@ -881,7 +895,7 @@ function renderSystemTab() {
     ? arr(sys.recent_system_logs)
     : arr(dashboardData.activity_logs).filter(log => ['SYSTEM', 'Hệ thống', 'Trạng thái'].includes(safeStatus(log.type)));
   document.getElementById('recentSystemLogs').innerHTML = recentLogs.length
-    ? recentLogs.slice(0, 8).map(log => `<div class="system-log-row"><span class="timeline-time">${safe(log.time || log.created_at)}</span><span>${highlightMessage(log.message || log.event || log.text)}</span></div>`).join('')
+    ? recentLogs.slice(0, 8).map(log => `<div class="system-log-row"><span class="timeline-time">${formatSystemDateTime(log.time || log.created_at)}</span><span>${highlightMessage(log.message || log.event || log.text)}</span></div>`).join('')
     : '<div class="empty-state">Chưa có nhật ký hệ thống.</div>';
 }
 

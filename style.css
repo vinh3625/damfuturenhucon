@@ -85,13 +85,13 @@ h1 { margin: 0; font-size: 31px; letter-spacing: .8px; }
   border-radius: 12px;
   box-shadow: var(--card-shadow);
 }
-.kpi-card { min-height: 118px; padding: 18px; display: grid; grid-template-columns: auto 1fr auto; gap: 16px; align-items: center; }
+.kpi-card { min-height: 118px; padding: 18px; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 16px; align-items: center; }
 .kpi-icon { width: 54px; height: 54px; display: grid; place-items: center; border: 1px solid rgba(96,255,88,.5); background: radial-gradient(circle, rgba(88,255,100,.25), rgba(21,70,35,.52)); border-radius: 50%; font-size: 25px; }
+.kpi-content { min-width: 0; }
 .kpi-label { color: #c8d2d1; font-size: 15px; }
 .kpi-value { font-size: 34px; font-weight: 900; margin: 3px 0 5px; }
 .kpi-sub { color: #a4b0b0; font-size: 13px; }
-.spark { width: 106px; height: 40px; }
-.spark path { fill: none; stroke: var(--green); stroke-width: 3; filter: none; }
+.spark { display: none; }
 .latest-card { padding: 22px; margin-bottom: 14px; position: relative; overflow: hidden; }
 .latest-card::before { content:""; position:absolute; inset:0; background-image: linear-gradient(rgba(103,240,92,.06) 1px, transparent 1px), linear-gradient(90deg, rgba(103,240,92,.05) 1px, transparent 1px); background-size: 28px 28px; opacity:.46; pointer-events:none; }
 .glow-card { border-color: rgba(103,240,92,.78); box-shadow: 0 14px 32px rgba(0,0,0,.34), 0 0 16px rgba(103,240,92,.10); }
@@ -246,7 +246,7 @@ label { color: #b5c1c4; display: flex; align-items: center; gap: 8px; }
 }
 
 .kpi-card {
-  grid-template-columns: 54px minmax(0, 1fr) minmax(72px, 106px);
+  grid-template-columns: 54px minmax(0, 1fr);
   overflow: hidden;
 }
 
@@ -254,14 +254,12 @@ label { color: #b5c1c4; display: flex; align-items: center; gap: 8px; }
 .kpi-sub,
 .kpi-value {
   min-width: 0;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
+  word-break: normal;
 }
 
 .kpi-card .spark {
-  width: 100%;
-  max-width: 106px;
-  min-width: 0;
-  justify-self: end;
+  display: none;
 }
 
 .chart-layout {
@@ -300,6 +298,10 @@ label { color: #b5c1c4; display: flex; align-items: center; gap: 8px; }
   overflow: hidden !important;
 }
 
+.kpi-card .spark {
+  display: none;
+}
+
 .table-wrap {
   max-width: 100%;
   overflow-x: auto;
@@ -320,7 +322,6 @@ label { color: #b5c1c4; display: flex; align-items: center; gap: 8px; }
 
 @media (max-width: 720px) {
   .kpi-card { grid-template-columns: 48px minmax(0, 1fr); }
-  .kpi-card .spark { grid-column: 1 / -1; width: 100%; max-width: none; }
 }
 
 /* ===== v4 live control-room polish ===== */
