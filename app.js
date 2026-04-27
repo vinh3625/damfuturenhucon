@@ -647,13 +647,38 @@ function renderLineChart(targetId = 'lineChart') {
 
   target.innerHTML = `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">${grid}<polygon class="performance-area" points="${area}"/><polyline class="performance-line" points="${pts}"/><line class="chart-grid" stroke-dasharray="5 5" x1="${padL}" x2="${w-padR+14}" y1="${y(0)}" y2="${y(0)}"/>${labels}<rect x="${bx}" y="${by}" width="70" height="26" rx="9" fill="rgba(103,240,92,.18)" stroke="rgba(103,240,92,.8)"/><text x="${bx+8}" y="${by+18}" fill="#67f05c" font-size="15" font-weight="800">${fmtR(last.r)}</text></svg>`;
 }
+
+function formatWeekDate(value) {
+  const raw = safeStatus(value).trim();
+  const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (match) return `${match[3]}/${match[2]}/${match[1]}`;
+  const time = Date.parse(raw);
+  if (Number.isNaN(time)) return safe(raw);
+  return new Intl.DateTimeFormat('vi-VN', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric'
+  }).format(new Date(time));
+}
+
+function weeklyLabelHtml(week = {}) {
+  const [start = '--', end = '--'] = safeStatus(week.range).split(/\s+-\s+/);
+  return `<div class="bar-label">
+    <span>${safe(week.label)}</span>
+    <span class="bar-separator">•</span>
+    <span>${formatWeekDate(start)}</span>
+    <span class="bar-separator">-</span>
+    <span>${formatWeekDate(end)}</span>
+  </div>`;
+}
+
 function renderWeeklyBars() {
   const weeklyResults = arr(dashboardData.weekly_results);
   const max = Math.max(1, ...weeklyResults.map(w => Math.abs(Number(w.r) || 0)));
   document.getElementById('weeklyBars').innerHTML = weeklyResults.length
     ? weeklyResults.map(w => {
       const value = safeNumber(w.r);
-      return `<div class="bar-item"><div class="bar-value">${fmtR(value)}</div><div class="bar" style="height:${Math.max(35, (Math.abs(value)/max)*180)}px"></div><div class="bar-label">${safe(w.label)}<br><small>(${safe(w.range)})</small></div></div>`;
+      return `<div class="bar-item"><div class="bar-value">${fmtR(value)}</div><div class="bar" style="height:${Math.max(35, (Math.abs(value)/max)*180)}px"></div>${weeklyLabelHtml(w)}</div>`;
     }).join('')
     : '<div class="empty-state">Chưa có kết quả theo tuần</div>';
 }
