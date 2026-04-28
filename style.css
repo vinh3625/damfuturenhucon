@@ -212,9 +212,11 @@ label { color: #b5c1c4; display: flex; align-items: center; gap: 8px; }
 .chart-grid { stroke: rgba(255,255,255,.08); stroke-width: 1; }
 .performance-line { fill: none; stroke: var(--green); stroke-width: 3; filter: none; }
 .performance-area { fill: rgba(103,240,92,.14); }
+.performance-point { fill: #07100e; stroke: var(--green); stroke-width: 3; }
 .bar-chart { height: 330px; display:flex; align-items:flex-end; justify-content: space-around; gap: 18px; padding: 34px 12px 34px; position: relative; }
 .bar-item { width: 86px; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; text-align:center; position: relative; z-index:1; }
 .bar { width: 40px; margin: 0 auto 10px; border-radius: 5px 5px 0 0; background: linear-gradient(180deg, #87ff76, #32c64e); box-shadow: 0 0 10px rgba(103,240,92,.12); }
+.bar-negative { background: linear-gradient(180deg, #ff7779, #d82f36); box-shadow: 0 0 10px rgba(255,77,79,.14); }
 .bar-value { color:#e7f6ea; font-weight:800; margin-bottom:7px; }
 .bar-label { width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; color:#cbd5d4; font-size:13px; line-height: 1.18; text-align: center; white-space: normal; }
 .bar-label span { display: block; width: 100%; text-align: center; }

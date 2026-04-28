@@ -321,6 +321,44 @@ function getItemTimestamp(item = {}) {
   return null;
 }
 
+function getTradeJournalTimestamp(item = {}) {
+  const fields = isClosedTrade(item)
+    ? [
+      'closed_at_iso',
+      'closed_at',
+      'exit_at',
+      'exited_at',
+      'closed_time',
+      'time_iso',
+      'timestamp',
+      'updated_at',
+      'time',
+      'date',
+      'display_time',
+      'created_at_iso',
+      'opened_at_iso',
+      'created_at'
+    ]
+    : [
+      'created_at_iso',
+      'opened_at_iso',
+      'time_iso',
+      'timestamp',
+      'updated_at',
+      'created_at',
+      'time',
+      'date',
+      'display_time'
+    ];
+
+  for (const field of fields) {
+    const time = parseDashboardTime(item[field], item);
+    if (time !== null) return time;
+  }
+
+  return null;
+}
+
 function getDatedItemTimestamp(item = {}) {
   const directTime = getItemTimestamp(item);
   if (directTime !== null) return directTime;
@@ -354,36 +392,59 @@ function isPendingHistoryRow(row = {}) {
 }
 
 function isClosedHistoryRow(row = {}) {
-  const status = safeStatus(row.status).toLowerCase();
-  const result = safeStatus(row.result || row.outcome || row.pnl_result);
-  return status.includes('đã đóng') || status.includes('closed') || Boolean(normalizeDistributionOutcome(result));
+  return isClosedTrade(row);
 }
 
 function normalizeDistributionOutcome(value) {
+  return normalizeResult({ result: value });
+}
+
+function normalizeResult(row = {}) {
+  const value = typeof row === 'object'
+    ? firstValue(row.result, row.outcome, row.pnl_result, row.label)
+    : row;
   const text = safeStatus(value).toUpperCase();
+  if (/\bSL\b/.test(text) || text.includes('STOP LOSS') || text.includes('LOST') || text.includes('LOSS')) return 'SL';
   if (/\bTP1\b/.test(text)) return 'TP1';
   if (/\bTP2\b/.test(text)) return 'TP2';
-  if (/\bSL\b/.test(text) || text.includes('STOP LOSS')) return 'SL';
-  if (text.includes('THOÁT') || text.includes('EARLY')) return 'Thoát sớm';
+  if (text.includes('EARLY') || text.includes('EXIT') || text.includes('THOÁT SỚM') || text.includes('THOAT SOM') || text.includes('THOÁT')) return 'Thoát sớm';
   return '';
 }
 
+function readTradeR(row = {}) {
+  const value = typeof row === 'object'
+    ? firstValue(row.r, row.rr, row.r_multiple, row.result_r, row.pnl_r)
+    : row;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+function isClosedTrade(row = {}) {
+  const status = safeStatus(row.status).toLowerCase();
+  return status.includes('đã đóng')
+    || status.includes('closed')
+    || Boolean(normalizeResult(row))
+    || readTradeR(row) !== null;
+}
+
 function resultRowsForStats(tradeJournal, recentResults) {
-  const journalRows = arr(tradeJournal).filter(row => isClosedHistoryRow(row) || row.r !== undefined);
+  const journalRows = arr(tradeJournal).filter(row => isClosedTrade(row));
   if (journalRows.length) return journalRows;
-  return arr(recentResults).filter(row => normalizeDistributionOutcome(row.result || row.status || row.label) || row.r !== undefined);
+  return arr(recentResults).filter(row => isClosedTrade(row));
 }
 
 function sumResultR(rows) {
   return arr(rows).reduce((sum, row) => {
-    const value = Number(firstValue(row.r, row.rr, row.r_multiple, row.result_r, row.pnl_r));
-    return Number.isFinite(value) ? sum + value : sum;
+    const value = readTradeR(row);
+    return value !== null ? sum + value : sum;
   }, 0);
 }
 
 function recomputeSummary(source = {}, filtered = {}) {
   const base = source.summary || {};
-  const activeTradesCount = arr(source.active_trades).length || safeNumber(base.active_trades);
+  const activeTradesCount = Array.isArray(source.active_trades)
+    ? source.active_trades.length
+    : safeNumber(base.active_trades);
   const historyRows = arr(filtered.trade_journal).length ? arr(filtered.trade_journal) : arr(filtered.signals);
   const resultRows = resultRowsForStats(filtered.trade_journal, filtered.recent_results);
   const resolvedRows = resultRows.filter(row => ['TP1', 'TP2', 'SL'].includes(normalizeDistributionOutcome(row.result || row.status || row.label)));
@@ -454,7 +515,7 @@ function createFilteredDashboardData(source = {}) {
   const filtered = {
     ...source,
     signals: filterHistoricalRows(source.signals),
-    trade_journal: filterHistoricalRows(source.trade_journal),
+    trade_journal: filterHistoricalRows(source.trade_journal, selectedTimeRange, getTradeJournalTimestamp),
     recent_results: filterHistoricalRows(source.recent_results),
     activity_logs: filterHistoricalRows(source.activity_logs),
     performance_30d: filterHistoricalRows(source.performance_30d, selectedTimeRange, getDatedItemTimestamp),
@@ -896,11 +957,7 @@ function readDirectionCount(direction) {
 }
 
 function normalizeOutcomeLabel(value) {
-  const text = safeStatus(value).toUpperCase();
-  if (/\bTP1\b/.test(text)) return 'TP1';
-  if (/\bTP2\b/.test(text)) return 'TP2';
-  if (/\bSL\b/.test(text) || text.includes('STOP LOSS')) return 'SL';
-  return '';
+  return normalizeResult({ result: value });
 }
 
 function readOutcomeCounts() {
@@ -993,17 +1050,65 @@ function renderHomeSignalStats() {
 }
 
 function renderRecentResults() {
-  const recentResults = arr(dashboardData.recent_results);
+  const recentResults = recentResultsForHome();
   document.getElementById('recentResults').innerHTML = recentResults.length
     ? recentResults.map(r => {
-      const result = safe(r.result);
-      return `<div class="result-row"><strong><span class="coin-icon" style="width:28px;height:28px;font-size:14px;margin-right:8px">${iconFor(r.symbol)}</span>${safe(r.symbol)}</strong><span class="${clsDir(r.direction)}">${safe(r.direction)}</span><strong class="${safeStatus(result).includes('SL') ? 'num-red' : safeStatus(result).includes('Thoát') ? 'num-cyan' : 'num-green'}">${result}</strong><strong class="${safeNumber(r.r) < 0 ? 'num-red' : 'num-green'}">${fmtR(r.r)}</strong></div>`;
+      const result = normalizeResult(r) || compactResultLabel(r.result);
+      const rValue = readTradeR(r);
+      return `<div class="result-row"><strong><span class="coin-icon" style="width:28px;height:28px;font-size:14px;margin-right:8px">${iconFor(r.symbol)}</span>${safe(r.symbol)}</strong><span class="${clsDir(r.direction)}">${safe(r.direction)}</span><strong class="${result === 'SL' ? 'num-red' : result === 'Thoát sớm' ? 'num-cyan' : 'num-green'}">${safe(result)}</strong><strong class="${safeNumber(rValue) < 0 ? 'num-red' : 'num-green'}">${rValue === null ? '--' : fmtR(rValue)}</strong></div>`;
     }).join('')
     : '<div class="empty-state">Chưa có kết quả gần đây</div>';
 }
 
+function recentResultsForHome() {
+  const existing = arr(dashboardData.recent_results);
+  if (existing.length) return existing;
+
+  return getFilteredTradeJournal()
+    .filter(isClosedTrade)
+    .slice(0, 5)
+    .map(row => ({
+      symbol: row.symbol,
+      direction: row.direction,
+      result: normalizeResult(row) || compactResultLabel(row.result),
+      r: readTradeR(row),
+      time: row.time
+    }));
+}
+
 function renderShortLogs() {
-  document.getElementById('shortLogs').innerHTML = arr(dashboardData.activity_logs).slice(0, 5).map(logRow).join('');
+  const logs = shortLogsForHome();
+  document.getElementById('shortLogs').innerHTML = logs.length
+    ? logs.map(logRow).join('')
+    : '<div class="empty-state">Chưa có nhật ký bot</div>';
+}
+
+function journalLogMessage(row = {}) {
+  const symbol = safe(row.symbol);
+  const direction = safe(row.direction);
+
+  if (isClosedTrade(row)) {
+    const result = normalizeResult(row) || compactResultLabel(row.result);
+    const rText = formatJournalR(readTradeR(row));
+    return `${symbol} ${direction} - ${safe(result)}${rText ? ` (${rText})` : ''}`;
+  }
+
+  if (isPendingHistoryRow(row)) return `${symbol} ${direction} - Chờ xác nhận`;
+  if (isJournalRunning(row)) return `${symbol} ${direction} - Đang chạy`;
+  return `${symbol} ${direction} - ${safe(row.status, 'Đang chạy')}`;
+}
+
+function shortLogsForHome() {
+  const existing = arr(dashboardData.activity_logs);
+  if (existing.length) return existing.slice(0, 5);
+
+  return getFilteredTradeJournal()
+    .slice(0, 5)
+    .map(row => ({
+      time: formatHHmm(row.time, row),
+      type: isClosedTrade(row) ? 'RESULT' : 'SIGNAL',
+      message: journalLogMessage(row)
+    }));
 }
 
 function field(label, value, cls = '') {
@@ -1167,7 +1272,7 @@ function insight(icon, label, value, rightLabel, rightValue) {
 function renderLineChart(targetId = 'lineChart') {
   const target = document.getElementById(targetId);
   if (!target) return;
-  const data = arr(dashboardData.performance_30d);
+  const data = performanceSeriesForChart();
   if (!data.length) {
     target.innerHTML = '<div class="empty-state">Chưa có dữ liệu hiệu suất</div>';
     return;
@@ -1190,14 +1295,27 @@ function renderLineChart(targetId = 'lineChart') {
     .join('');
   const labelIndexes = new Set([0, 3, 6, 9, 12, data.length - 1]);
   const labels = data
-    .map((d, i) => labelIndexes.has(i) ? `<text class="axis-label" x="${Math.max(padL - 10, x(i)-18)}" y="${h-10}">${formatDateVN(d.date || d.time || d.created_at)}</text>` : '')
+    .map((d, i) => labelIndexes.has(i) ? `<text class="axis-label" x="${Math.max(padL - 10, x(i)-18)}" y="${h-10}">${performancePointLabel(d)}</text>` : '')
+    .join('');
+  const markers = data
+    .map((d, i) => `<circle class="performance-point" cx="${x(i)}" cy="${y(safeNumber(d.r))}" r="${data.length === 1 ? 5 : 3.5}"/>`)
     .join('');
 
   const last = data[data.length - 1];
   const bx = Math.min(w - padR + 10, x(data.length - 1) - 6);
   const by = Math.max(8, y(safeNumber(last.r)) - 28);
+  const isNegative = safeNumber(last.r) < 0;
+  const tagFill = isNegative ? 'rgba(255,77,79,.18)' : 'rgba(103,240,92,.18)';
+  const tagStroke = isNegative ? 'rgba(255,77,79,.8)' : 'rgba(103,240,92,.8)';
+  const tagText = isNegative ? '#ff4d4f' : '#67f05c';
 
-  target.innerHTML = `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">${grid}<polygon class="performance-area" points="${area}"/><polyline class="performance-line" points="${pts}"/><line class="chart-grid" stroke-dasharray="5 5" x1="${padL}" x2="${w-padR+14}" y1="${y(0)}" y2="${y(0)}"/>${labels}<rect x="${bx}" y="${by}" width="70" height="26" rx="9" fill="rgba(103,240,92,.18)" stroke="rgba(103,240,92,.8)"/><text x="${bx+8}" y="${by+18}" fill="#67f05c" font-size="15" font-weight="800">${fmtR(last.r)}</text></svg>`;
+  target.innerHTML = `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">${grid}<polygon class="performance-area" points="${area}"/><polyline class="performance-line" points="${pts}"/>${markers}<line class="chart-grid" stroke-dasharray="5 5" x1="${padL}" x2="${w-padR+14}" y1="${y(0)}" y2="${y(0)}"/>${labels}<rect x="${bx}" y="${by}" width="70" height="26" rx="9" fill="${tagFill}" stroke="${tagStroke}"/><text x="${bx+8}" y="${by+18}" fill="${tagText}" font-size="15" font-weight="800">${fmtR(last.r)}</text></svg>`;
+}
+
+function performancePointLabel(point = {}) {
+  if (point.label) return safe(point.label);
+  if (selectedTimeRange === '1D') return formatHHmm(firstValue(point.time, point.created_at, point.date), point);
+  return formatDateVN(firstValue(point.date, point.time, point.created_at));
 }
 
 function formatWeekDate(value) {
@@ -1208,22 +1326,22 @@ function weeklyLabelHtml(week = {}) {
   const [rangeStart = '--', rangeEnd = '--'] = safeStatus(week.range).split(/\s+-\s+/);
   const start = week.start_date || rangeStart;
   const end = week.end_date || rangeEnd;
+  const summary = safeStatus(week.result_summary);
   return `<div class="bar-label">
     <span>${safe(week.label)}</span>
-    <span class="bar-separator">•</span>
-    <span>${formatWeekDate(start)}</span>
-    <span class="bar-separator">-</span>
-    <span>${formatWeekDate(end)}</span>
+    ${summary ? `<span>${summary}</span>` : ''}
+    ${start !== '--' ? `<span class="bar-separator">•</span><span>${formatWeekDate(start)}</span>` : ''}
+    ${end !== '--' && end !== start ? `<span class="bar-separator">-</span><span>${formatWeekDate(end)}</span>` : ''}
   </div>`;
 }
 
 function renderWeeklyBars() {
-  const weeklyResults = arr(dashboardData.weekly_results);
+  const weeklyResults = resultPeriodsForBars();
   const max = Math.max(1, ...weeklyResults.map(w => Math.abs(Number(w.r) || 0)));
   document.getElementById('weeklyBars').innerHTML = weeklyResults.length
     ? weeklyResults.map(w => {
       const value = safeNumber(w.r);
-      return `<div class="bar-item"><div class="bar-value">${fmtR(value)}</div><div class="bar" style="height:${Math.max(35, (Math.abs(value)/max)*180)}px"></div>${weeklyLabelHtml(w)}</div>`;
+      return `<div class="bar-item"><div class="bar-value ${value < 0 ? 'num-red' : 'num-green'}">${fmtR(value)}</div><div class="bar ${value < 0 ? 'bar-negative' : ''}" style="height:${Math.max(35, (Math.abs(value)/max)*180)}px"></div>${weeklyLabelHtml(w)}</div>`;
     }).join('')
     : `<div class="empty-state">Chưa có ${getResultPeriodTitle().toLowerCase()}</div>`;
 }
@@ -1256,8 +1374,13 @@ function journalResultFromStatus(status) {
 
 function normalizeJournalRow(row = {}, fallback = {}) {
   const status = firstValue(row.status, fallback.status, row.result ? 'Đã đóng' : '');
+  const result = firstValue(row.result, row.outcome, row.pnl_result, journalResultFromStatus(status), fallback.result);
+  const closed = isClosedTrade({ ...row, status, result });
+  const time = closed
+    ? firstValue(row.closed_at_iso, row.closed_at, row.exit_at, row.exited_at, row.closed_time, row.time_iso, row.timestamp, row.updated_at, row.time, row.date, row.display_time, row.created_at_iso, row.opened_at_iso, row.created_at, fallback.time)
+    : firstValue(row.created_at_iso, row.opened_at_iso, row.time_iso, row.timestamp, row.updated_at, row.created_at, row.time, row.date, row.display_time, fallback.time);
   return {
-    time: firstValue(row.created_at_iso, row.opened_at_iso, row.closed_at_iso, row.time_iso, row.timestamp, row.updated_at, row.created_at, row.time, row.date, row.display_time, fallback.time),
+    time,
     symbol: firstValue(row.symbol, fallback.symbol),
     direction: safeStatus(firstValue(row.direction, fallback.direction)).toUpperCase(),
     timeframe: firstValue(row.timeframe, row.tf, row.frame, fallback.timeframe),
@@ -1267,7 +1390,7 @@ function normalizeJournalRow(row = {}, fallback = {}) {
     tp2: firstValue(row.tp2, fallback.tp2),
     position_value: firstValue(row.position_value, row.positionValue, row.order_value, row.value, fallback.position_value),
     status,
-    result: firstValue(row.result, row.outcome, row.pnl_result, journalResultFromStatus(status), fallback.result),
+    result,
     r: firstValue(row.r, row.rr, row.r_multiple, row.result_r, row.pnl_r, fallback.r)
   };
 }
@@ -1311,6 +1434,157 @@ function fallbackJournalRows() {
 function tradeJournalRows() {
   const journal = arr(dashboardData.trade_journal);
   return journal.map(row => normalizeJournalRow(row));
+}
+
+function rowTimestamp(row = {}) {
+  return getItemTimestamp(row);
+}
+
+function sortNewestRows(rows) {
+  return arr(rows).slice().sort((a, b) => (rowTimestamp(b) ?? -Infinity) - (rowTimestamp(a) ?? -Infinity));
+}
+
+function sortOldestRows(rows) {
+  return arr(rows).slice().sort((a, b) => (rowTimestamp(a) ?? Infinity) - (rowTimestamp(b) ?? Infinity));
+}
+
+function getFilteredTradeJournal() {
+  return sortNewestRows(arr(dashboardData?.trade_journal)
+    .map(row => normalizeJournalRow(row))
+    .filter(row => isWithinSelectedRange(row)));
+}
+
+function formatHHmm(value, item = {}) {
+  const time = parseDashboardTime(value, item);
+  if (time !== null) {
+    const parts = getVietnamDateParts(new Date(time));
+    return `${String(parts.hour).padStart(2, '0')}:${String(parts.minute).padStart(2, '0')}`;
+  }
+
+  const match = safeStatus(value).match(/\b(\d{1,2}):(\d{2})/);
+  return match ? `${String(match[1]).padStart(2, '0')}:${match[2]}` : '--';
+}
+
+function formatDateKeyVN(value, item = {}) {
+  const time = parseDashboardTime(value, item);
+  if (time === null) return '';
+  const parts = getVietnamDateParts(new Date(time));
+  return `${parts.year}-${String(parts.month).padStart(2, '0')}-${String(parts.day).padStart(2, '0')}`;
+}
+
+function roundR(value) {
+  return Number(safeNumber(value).toFixed(2));
+}
+
+function resultCountsForRows(rows) {
+  const counts = { SL: 0, TP1: 0, TP2: 0, 'Thoát sớm': 0 };
+  arr(rows).forEach(row => {
+    const result = normalizeResult(row);
+    if (counts[result] !== undefined) counts[result] += 1;
+  });
+  return counts;
+}
+
+function formatResultSummary(counts) {
+  return ['SL', 'TP1', 'TP2', 'Thoát sớm']
+    .filter(label => safeNumber(counts[label]) > 0)
+    .map(label => `${label}: ${safeNumber(counts[label])}`)
+    .join(' · ');
+}
+
+function closedJournalRowsWithR() {
+  return sortOldestRows(getFilteredTradeJournal())
+    .filter(row => isClosedTrade(row) && readTradeR(row) !== null);
+}
+
+function derivePerformanceSeriesFromTradeJournal() {
+  const rows = closedJournalRowsWithR();
+  if (!rows.length) return [];
+
+  let cumulative = 0;
+  if (selectedTimeRange === '1D') {
+    return rows.map(row => {
+      const value = readTradeR(row);
+      cumulative += value;
+      return {
+        time: row.time,
+        label: formatHHmm(row.time, row),
+        r: roundR(cumulative),
+        symbol: row.symbol,
+        result: normalizeResult(row)
+      };
+    });
+  }
+
+  const groups = new Map();
+  rows.forEach(row => {
+    const key = formatDateKeyVN(row.time, row);
+    if (!key) return;
+    if (!groups.has(key)) groups.set(key, { date: key, time: row.time, rows: [], r: 0 });
+    const group = groups.get(key);
+    group.rows.push(row);
+    group.r += readTradeR(row);
+  });
+
+  return Array.from(groups.values())
+    .sort((a, b) => (parseDashboardTime(a.date) ?? 0) - (parseDashboardTime(b.date) ?? 0))
+    .map(group => {
+      cumulative += group.r;
+      return {
+        date: group.date,
+        time: group.time,
+        label: formatDateVN(group.date),
+        r: roundR(cumulative),
+        period_r: roundR(group.r)
+      };
+    });
+}
+
+function performanceSeriesForChart() {
+  const existing = arr(dashboardData.performance_30d);
+  return existing.length ? existing : derivePerformanceSeriesFromTradeJournal();
+}
+
+function deriveResultPeriodsFromTradeJournal() {
+  const rows = sortOldestRows(getFilteredTradeJournal()).filter(isClosedTrade);
+  if (!rows.length) return [];
+
+  if (selectedTimeRange === '1D') {
+    const counts = resultCountsForRows(rows);
+    const totalR = sumResultR(rows);
+    const todayKey = formatDateKeyVN(getVietnamNow());
+    return [{
+      label: 'Hôm nay',
+      date: todayKey,
+      start_date: todayKey,
+      end_date: todayKey,
+      r: roundR(totalR),
+      result_summary: formatResultSummary(counts)
+    }];
+  }
+
+  const groups = new Map();
+  rows.forEach(row => {
+    const key = formatDateKeyVN(row.time, row);
+    if (!key) return;
+    if (!groups.has(key)) groups.set(key, { label: formatDateVN(key), date: key, start_date: key, end_date: key, rows: [], r: 0 });
+    const group = groups.get(key);
+    group.rows.push(row);
+    group.r += readTradeR(row) ?? 0;
+  });
+
+  return Array.from(groups.values())
+    .sort((a, b) => (parseDashboardTime(a.date) ?? 0) - (parseDashboardTime(b.date) ?? 0))
+    .map(group => ({
+      ...group,
+      r: roundR(group.r),
+      result_summary: formatResultSummary(resultCountsForRows(group.rows))
+    }));
+}
+
+function resultPeriodsForBars() {
+  const existing = arr(dashboardData.weekly_results);
+  return existing.length ? existing : deriveResultPeriodsFromTradeJournal();
 }
 
 function matchesTradeJournalFilter(row) {
@@ -1449,9 +1723,14 @@ function renderSystemSummary() {
   const sys = dashboardData.system || {};
   document.getElementById('systemSummary').innerHTML = `<div class="panel-title">〽 Tóm tắt trạng thái</div>
     ${systemRow('Risk lock hôm nay', sys.risk_lock ? 'Bật' : 'Tắt', sys.risk_lock)}
-    ${systemRow('Trạng thái dữ liệu', sys.data_status, false)}${systemRow('Lỗi gần nhất', sys.last_error, false)}${systemRow('Quét M5 cuối', sys.last_m5_scan, false, 'num-cyan')}${systemRow('Vị thế active', sys.active_positions, false)}`;
+    ${systemRow('Trạng thái dữ liệu', sys.data_status, false)}${systemRow('Lỗi gần nhất', sys.last_error, false)}${systemRow('Quét M5 cuối', sys.last_m5_scan, false, 'num-cyan')}${systemRow('Vị thế active', activePositionsCount(), false)}`;
 }
 function systemRow(label, value, danger=false, cls='num-green') { return `<div class="system-row"><span>${label}</span><strong class="${danger?'num-red':cls}">${safe(value)}</strong></div>`; }
+
+function activePositionsCount() {
+  if (Array.isArray(dashboardData?.active_trades)) return dashboardData.active_trades.length;
+  return safeNumber(dashboardData?.system?.active_positions);
+}
 
 function hideLogSystemSummary() {
   const panel = document.getElementById('systemSummary');
@@ -1573,7 +1852,7 @@ function renderSystemTab() {
   const botStatus = safe(sys.bot_status_text || bot.status_text, 'Đang hoạt động');
   const scanStatus = safe(sys.scan_status, 'Chờ nến đóng');
   const riskLock = sys.risk_lock ? 'Bật' : 'Tắt';
-  const activePositions = safeNumber(sys.active_positions);
+  const activePositions = activePositionsCount();
 
   document.getElementById('systemKpis').innerHTML = [
     systemStatusCard('●', 'Bot trạng thái', botStatus, 'trạng thái vận hành', 'num-green'),
@@ -1599,7 +1878,7 @@ function renderSystemTab() {
   ].join('');
 
   document.getElementById('positionsStatus').innerHTML = [
-    systemListRow('Active positions', safeNumber(sys.active_positions)),
+    systemListRow('Active positions', activePositions),
     systemListRow('Active signals', safeNumber(sys.active_signals, safeNumber(summary.active_signals))),
     systemListRow('Pending signals', safeNumber(sys.pending_signals, safeNumber(summary.pending_signals))),
     systemListRow('Closed hôm nay', safeNumber(sys.closed_today)),

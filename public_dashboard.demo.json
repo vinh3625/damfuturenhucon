@@ -269,6 +269,20 @@
   ],
   "trade_journal": [
     {
+      "time": "2026-04-29T06:12:00+07:00",
+      "symbol": "TRXUSDT",
+      "direction": "SHORT",
+      "timeframe": "M5",
+      "entry": 0.2531,
+      "sl": 0.2562,
+      "tp1": 0.2498,
+      "tp2": 0.2459,
+      "position_value": "400 USDT",
+      "status": "Đã đóng",
+      "result": "SL",
+      "r": -0.9
+    },
+    {
       "time": "2026-04-28T05:46:13+07:00",
       "symbol": "BTCUSDT",
       "direction": "LONG",
