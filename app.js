@@ -47,6 +47,41 @@ const safeNumber = (value, fallback = 0) => {
   return Number.isFinite(number) ? number : fallback;
 };
 const safeStatus = (value) => String(value || '');
+function escapeHtml(value) {
+  return safeStatus(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function formatSymbolParts(symbol) {
+  const raw = String(symbol || '').trim().toUpperCase();
+  if (!raw) return { base: '--', quote: '' };
+
+  if (raw.endsWith('USDT')) {
+    return {
+      base: raw.slice(0, -4),
+      quote: 'USDT'
+    };
+  }
+
+  return {
+    base: raw,
+    quote: ''
+  };
+}
+
+function renderSymbol(symbol) {
+  const { base, quote } = formatSymbolParts(symbol);
+  return `<span class="symbol-base">${escapeHtml(base)}</span>${quote ? `<span class="symbol-quote">${escapeHtml(quote)}</span>` : ''}`;
+}
+
+function renderSymbolWithIcon(symbol, iconStyle = 'width:30px;height:30px;font-size:14px;margin-right:8px') {
+  return `<span class="coin-icon" style="${iconStyle}">${iconFor(symbol)}</span>${renderSymbol(symbol)}`;
+}
+
 const signalList = () => {
   const signals = arr(dashboardData?.signals);
   if (signals.length) return signals;
@@ -438,18 +473,40 @@ function parseDashboardTimestamp(value, item = {}) {
   return parseDashboardTime(value, item);
 }
 
-function formatDateVN(value) {
+function formatDateShortYear(value, { dateOnly = false } = {}) {
+  if (value === undefined || value === null || value === '') return '--';
+  if (typeof value === 'number' && (!Number.isFinite(value) || value < 1e9)) return '--';
+
+  if (typeof value === 'string') {
+    const raw = value.trim();
+    if (!raw || raw === '-' || raw === '--') return '--';
+    const timeOnly = raw.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+    if (timeOnly) return `${String(timeOnly[1]).padStart(2, '0')}:${timeOnly[2]}`;
+    const dmy = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
+    if (dmy) {
+      const shortDate = `${String(dmy[1]).padStart(2, '0')}/${String(dmy[2]).padStart(2, '0')}/${String(Number(dmy[3]) % 100).padStart(2, '0')}`;
+      return dmy[4] && !dateOnly ? `${shortDate} ${String(dmy[4]).padStart(2, '0')}:${dmy[5]}` : shortDate;
+    }
+    if (/^\d{4}$/.test(raw)) return '--';
+  }
+
   const time = parseDashboardTime(value);
-  if (time === null) return safe(value);
+  if (time === null) return '--';
   const parts = getVietnamDateParts(new Date(time));
-  return `${String(parts.day).padStart(2, '0')}/${String(parts.month).padStart(2, '0')}/${parts.year}`;
+  const shortDate = `${String(parts.day).padStart(2, '0')}/${String(parts.month).padStart(2, '0')}/${String(parts.year % 100).padStart(2, '0')}`;
+  if (dateOnly) return shortDate;
+
+  const raw = typeof value === 'string' ? value.trim() : '';
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return shortDate;
+  return `${shortDate} ${String(parts.hour).padStart(2, '0')}:${String(parts.minute).padStart(2, '0')}`;
+}
+
+function formatDateVN(value) {
+  return formatDateShortYear(value, { dateOnly: true });
 }
 
 function formatDateTimeVN(value) {
-  const time = parseDashboardTime(value);
-  if (time === null) return safe(value);
-  const parts = getVietnamDateParts(new Date(time));
-  return `${String(parts.day).padStart(2, '0')}/${String(parts.month).padStart(2, '0')}/${parts.year} ${String(parts.hour).padStart(2, '0')}:${String(parts.minute).padStart(2, '0')}`;
+  return formatDateShortYear(value);
 }
 
 function formatItemDateTimeVN(item = {}) {
@@ -982,7 +1039,7 @@ function renderActiveSignalBanner() {
     <div class="active-banner-head">
       <span class="state-dot green"></span>
       <span>Tín hiệu đang chạy</span>
-      <strong>${symbol}</strong>
+      <strong>${renderSymbol(symbol)}</strong>
       <span class="badge ${directionClass}">${direction}</span>
     </div>
     <div class="active-banner-grid">
@@ -1102,7 +1159,7 @@ function renderHome() {
   document.getElementById('latestSignal').innerHTML = `<div class="latest-inner">
     <div class="panel-title">🔥 Tín hiệu mới nhất</div>
     <div class="latest-grid">
-      <div class="signal-symbol"><span class="coin-icon ${metricChanged('latest_signal.symbol') ? 'soft-pulse' : ''}">${iconFor(latestSymbol)}</span><span class="big-symbol ${metricChanged('latest_signal.symbol') ? 'value-flash' : ''}">${latestSymbol}</span><span class="badge ${clsDir(latestDirection)}">${latestDirection}</span></div>
+      <div class="signal-symbol"><span class="coin-icon ${metricChanged('latest_signal.symbol') ? 'soft-pulse' : ''}">${iconFor(latestSymbol)}</span><span class="big-symbol ${metricChanged('latest_signal.symbol') ? 'value-flash' : ''}">${renderSymbol(latestSymbol)}</span><span class="badge ${clsDir(latestDirection)}">${latestDirection}</span></div>
       ${field('Khung', l.timeframe)}${field('Entry', formatMaybePrice(l.entry))}${field('SL', formatMaybePrice(l.sl), 'num-red')}${field('TP1', formatMaybePrice(l.tp1), 'num-green')}${field('TP2', formatMaybePrice(l.tp2), 'num-green')}
       <div class="target-mark">◎</div>
     </div>
@@ -1120,7 +1177,7 @@ function renderHome() {
   document.getElementById('livePanelList').innerHTML = arr(dashboardData.live_panel).map(item => {
     const status = sanitizePublicText(item.status);
     const note = sanitizePublicText(item.note);
-    return `<div class="live-row"><strong>${safe(item.symbol)}</strong><span><i class="state-dot ${safeStatus(status).includes('lệnh') ? 'green' : ''}"></i>${status}</span><span class="${safeStatus(note).includes('Chờ') ? 'num-red' : safeStatus(note).includes('setup') ? 'num-green' : ''}">${note}</span></div>`;
+    return `<div class="live-row"><strong>${renderSymbol(item.symbol)}</strong><span><i class="state-dot ${safeStatus(status).includes('lệnh') ? 'green' : ''}"></i>${status}</span><span class="${safeStatus(note).includes('Chờ') ? 'num-red' : safeStatus(note).includes('setup') ? 'num-green' : ''}">${note}</span></div>`;
   }).join('');
   renderSystemMini('systemMini');
   renderRecentResults();
@@ -1281,7 +1338,7 @@ function renderRecentResults() {
       const rValue = readTradeR(r);
       return `<div class="recent-result-row">
         <span class="timeline-time">${formatSystemLogTime(r)}</span>
-        <strong><span class="coin-icon" style="width:28px;height:28px;font-size:14px;margin-right:8px">${iconFor(r.symbol)}</span>${safe(r.symbol)}</strong>
+        <strong>${renderSymbolWithIcon(r.symbol, 'width:28px;height:28px;font-size:14px;margin-right:8px')}</strong>
         <span><span class="badge ${clsDir(r.direction)}">${safe(r.direction)}</span></span>
         <strong class="${outcome === 'SL' ? 'num-red' : outcome === 'Thoát sớm' ? 'num-cyan' : 'num-green'}">${safe(result)}</strong>
         <strong class="${safeNumber(rValue) < 0 ? 'num-red' : 'num-green'}">${rValue === null ? '--' : fmtR(rValue)}</strong>
@@ -1354,7 +1411,7 @@ function field(label, value, cls = '') {
 function tradeRow(t, changed = false) {
   const status = safe(t.status);
   const statusClass = safeStatus(status).includes('Chờ') ? 'wait' : 'green';
-  return `<tr class="${changed ? 'row-enter' : ''}"><td><strong><span class="coin-icon" style="width:30px;height:30px;font-size:14px;margin-right:8px">${iconFor(t.symbol)}</span>${safe(t.symbol)}</strong></td><td class="${clsDir(t.direction)}"><strong>${safe(t.direction)}</strong></td><td>${formatMaybePrice(t.entry)}</td><td>${formatMaybePrice(t.tp1)}</td><td>${formatMaybePrice(t.tp2)}</td><td class="num-red">${formatMaybePrice(t.sl)}</td><td><span class="badge ${statusClass}">${status}</span></td></tr>`;
+  return `<tr class="${changed ? 'row-enter' : ''}"><td><strong>${renderSymbolWithIcon(t.symbol)}</strong></td><td class="${clsDir(t.direction)}"><strong>${safe(t.direction)}</strong></td><td>${formatMaybePrice(t.entry)}</td><td>${formatMaybePrice(t.tp1)}</td><td>${formatMaybePrice(t.tp2)}</td><td class="num-red">${formatMaybePrice(t.sl)}</td><td><span class="badge ${statusClass}">${status}</span></td></tr>`;
 }
 
 function renderSystemMini(id) {
@@ -1415,7 +1472,7 @@ function renderSignalTable() {
   document.getElementById('signalsBody').innerHTML = rows.map((sig, idx) => {
     const status = safe(sig.status, 'Chưa có tín hiệu');
     return `<tr class="${idx === selectedSignalIndex ? 'selected' : ''}" data-signal-index="${idx}">
-      <td><strong><span class="coin-icon" style="width:30px;height:30px;font-size:14px;margin-right:8px">${iconFor(sig.symbol)}</span>${safe(sig.symbol, 'ETHUSDT')}</strong></td>
+      <td><strong>${renderSymbolWithIcon(safe(sig.symbol, 'ETHUSDT'))}</strong></td>
       <td class="${clsDir(sig.direction)}"><strong>${safe(sig.direction, 'LONG')}</strong></td>
       <td>${safe(sig.timeframe)}</td><td>${formatMaybePrice(sig.entry)}</td><td class="num-red">${formatMaybePrice(sig.sl)}</td><td class="num-green">${formatMaybePrice(sig.tp1)}</td><td class="num-green">${formatMaybePrice(sig.tp2)}</td>
       <td><span class="badge ${statusClass(status)}">${status}</span></td>
@@ -1442,7 +1499,7 @@ function renderSignalDetail(sig = {}) {
   const timeText = formatItemDateTimeVN(sig);
 
   document.getElementById('signalDetail').innerHTML = `<div class="panel-title">◎ Chi tiết tín hiệu</div>
-    <div class="signal-symbol" style="margin-bottom:16px"><span class="coin-icon">${iconFor(symbol)}</span><span class="big-symbol">${symbol}</span><span class="badge ${clsDir(direction)}">${direction}</span></div>
+    <div class="signal-symbol" style="margin-bottom:16px"><span class="coin-icon">${iconFor(symbol)}</span><span class="big-symbol">${renderSymbol(symbol)}</span><span class="badge ${clsDir(direction)}">${direction}</span></div>
     ${detailRow('R:R', formatRiskReward(sig), 'num-cyan')}${detailRow('Khung thời gian', safe(sig.timeframe))}${detailRow('Entry', formatMaybePrice(sig.entry))}${detailRow('Stop Loss (SL)', formatMaybePrice(sig.sl), 'num-red')}${detailRow('Take Profit 1 (TP1)', formatMaybePrice(sig.tp1), 'num-green')}${detailRow('Take Profit 2 (TP2)', formatMaybePrice(sig.tp2), 'num-green')}${detailRow('Độ tự tin', safe(sig.confidence), 'num-green')}${detailRow('Trạng thái', `<span class="badge ${statusClass(status)}">${status}</span>`)}${detailRow('Thời gian', timeText)}
     <div class="note-box"><strong class="num-green">ⓘ Ghi chú</strong><br>${sanitizePublicText(sig.note) === '--' ? 'Không có ghi chú' : sanitizePublicText(sig.note)}</div>`;
 }
@@ -1465,11 +1522,11 @@ function renderPerformance() {
   renderPerformanceDistribution();
   const pairPerformance = arr(dashboardData.pair_performance);
   document.getElementById('pairPerfBody').innerHTML = pairPerformance.length
-    ? pairPerformance.map(p => `<tr><td><strong><span class="coin-icon" style="width:28px;height:28px;font-size:14px;margin-right:8px">${iconFor(p.symbol)}</span>${safe(p.symbol)}</strong></td><td>${safeNumber(p.trades)}</td><td class="num-green">${safeNumber(p.win_rate)}%</td><td class="${safeNumber(p.r) < 0 ? 'num-red' : 'num-green'}">${fmtR(p.r)}</td></tr>`).join('')
+    ? pairPerformance.map(p => `<tr><td><strong>${renderSymbolWithIcon(p.symbol, 'width:28px;height:28px;font-size:14px;margin-right:8px')}</strong></td><td>${safeNumber(p.trades)}</td><td class="num-green">${safeNumber(p.win_rate)}%</td><td class="${safeNumber(p.r) < 0 ? 'num-red' : 'num-green'}">${fmtR(p.r)}</td></tr>`).join('')
     : '<tr><td colspan="4" class="empty-state">Chưa có hiệu suất theo cặp</td></tr>';
   const best = pairPerformance.slice().sort((a,b)=>safeNumber(b.r)-safeNumber(a.r))[0] || {};
   document.getElementById('insights').innerHTML = `<div class="panel-title">🎯 Insights nhanh</div>
-    ${insight('🏆', 'Cặp tốt nhất', safe(best.symbol, 'ETHUSDT'), 'Tổng R', fmtR(best.r))}
+    ${insight('🏆', 'Cặp tốt nhất', renderSymbol(safe(best.symbol, 'ETHUSDT')), 'Tổng R', fmtR(best.r))}
     ${insight('🕘', 'Khung hiệu quả', 'M5', 'Win rate', '61.3%')}
     ${insight('↗', 'Chuỗi thắng dài nhất', '5', 'Tín hiệu', '(17/04 – 21/04)')}`;
 }
@@ -1947,7 +2004,7 @@ function renderTradeJournal() {
       const result = formatJournalResult(row);
       return `<tr>
         <td class="journal-time">${formatSystemDateTime(row.time)}</td>
-        <td><strong>${safe(row.symbol)}</strong></td>
+        <td><strong>${renderSymbol(row.symbol)}</strong></td>
         <td><span class="badge ${directionClass}">${direction}</span></td>
         <td>${safe(row.timeframe)}</td>
         <td>${formatTradeNumber(row.entry)}</td>
@@ -2297,6 +2354,7 @@ function dotClass(type) { return type === 'Cảnh báo' ? 'yellow' : type === 'T
 function typeClass(type) { return type === 'Cảnh báo' ? 'num-red' : type === 'Thoát lệnh' ? 'num-red' : type === 'Vào lệnh' ? 'num-green' : type === 'Tín hiệu' ? 'num-cyan' : 'num-cyan'; }
 function highlightMessage(message) {
   return sanitizePublicText(message)
+    .replace(/\b([A-Z0-9]{2,20}USDT)\b/g, symbol => renderSymbol(symbol))
     .replace(/\bLONG\b/g, '<strong class="pos">LONG</strong>')
     .replace(/\bSHORT\b/g, '<strong class="neg">SHORT</strong>')
     .replace(/TP1|TP2/g, '<strong class="num-green">$&</strong>')

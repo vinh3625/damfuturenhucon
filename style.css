@@ -141,6 +141,24 @@ h1 { margin: 0; font-size: 31px; letter-spacing: .8px; }
 .signal-symbol { display: flex; align-items: center; gap: 14px; }
 .coin-icon { width: 42px; height: 42px; display: inline-grid; place-items: center; border-radius: 50%; background: rgba(255,255,255,.06); border: 1px solid rgba(150,232,255,.25); font-size: 22px; flex: 0 0 auto; }
 .big-symbol { font-size: 28px; font-weight: 950; }
+.symbol-base {
+  font-weight: 900;
+  letter-spacing: 0.02em;
+}
+.symbol-quote {
+  font-size: 0.72em;
+  font-weight: 500;
+  text-transform: uppercase;
+  opacity: 0.68;
+  margin-left: 1px;
+  letter-spacing: 0.02em;
+}
+.big-symbol .symbol-base {
+  font-weight: 950;
+}
+.big-symbol .symbol-quote {
+  font-size: 0.62em;
+}
 .field-label { color: #b2bec2; font-size: 13px; margin-bottom: 7px; }
 .field-value { font-size: 21px; font-weight: 850; }
 .badge { display: inline-flex; align-items:center; justify-content:center; padding: 5px 12px; border-radius: 9px; font-size: 13px; font-weight: 900; border: 1px solid currentColor; background: rgba(255,255,255,.04); white-space: nowrap; }
