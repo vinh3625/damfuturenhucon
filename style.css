@@ -339,17 +339,17 @@ label { color: #b5c1c4; display: flex; align-items: center; gap: 8px; }
 .range-bars-scroll {
   overflow-x: auto;
   overflow-y: hidden;
-  padding: 8px 2px 2px;
+  padding: 8px 2px 4px;
   -webkit-overflow-scrolling: touch;
 }
 .range-bars-plot {
   --bucket-count: 7;
   position: relative;
-  min-width: max(100%, calc(var(--bucket-count) * 42px));
-  height: 230px;
+  min-width: max(100%, calc(var(--bucket-count) * 82px));
+  height: 250px;
   display: grid;
-  grid-template-columns: repeat(var(--bucket-count), minmax(28px, 1fr));
-  gap: 8px;
+  grid-template-columns: repeat(var(--bucket-count), minmax(64px, 1fr));
+  gap: 12px;
   align-items: stretch;
   padding: 12px 4px 0;
 }
@@ -359,28 +359,22 @@ label { color: #b5c1c4; display: flex; align-items: center; gap: 8px; }
   margin: 0 auto;
 }
 .range-result-chart.compact .range-bars-plot {
-  min-width: max(100%, calc(var(--bucket-count) * 28px));
-  gap: 4px;
-}
-.range-zero-line {
-  position: absolute;
-  left: 4px;
-  right: 4px;
-  top: calc(50% + 12px);
-  height: 1px;
-  background: rgba(255, 255, 255, .18);
-  box-shadow: 0 0 10px rgba(55, 200, 255, .08);
+  min-width: max(100%, calc(var(--bucket-count) * 54px));
+  grid-template-columns: repeat(var(--bucket-count), minmax(42px, 1fr));
+  gap: 6px;
 }
 .range-bar-column {
   position: relative;
   display: grid;
-  grid-template-rows: 24px 1fr 30px;
+  grid-template-rows: 24px 1fr auto;
+  gap: 6px;
   min-width: 0;
   text-align: center;
 }
 .range-bar-track {
   position: relative;
-  min-height: 150px;
+  min-height: 162px;
+  border-bottom: 1px solid rgba(255, 255, 255, .14);
 }
 .range-bar-fill {
   position: absolute;
@@ -401,11 +395,12 @@ label { color: #b5c1c4; display: flex; align-items: center; gap: 8px; }
 .range-bar-fill.negative {
   background: linear-gradient(180deg, #ff7779, #d82f36);
   box-shadow: 0 0 12px rgba(255, 77, 79, .16);
-  border-radius: 2px 2px 7px 7px;
+  border-radius: 7px 7px 2px 2px;
 }
 .range-bar-fill.zero {
   background: rgba(180, 195, 200, .34);
   box-shadow: none;
+  border-radius: 999px;
 }
 .range-bar-r-label {
   display: block;
@@ -422,10 +417,15 @@ label { color: #b5c1c4; display: flex; align-items: center; gap: 8px; }
   font-size: 11px;
   font-weight: 800;
   line-height: 1.15;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
   align-self: end;
+}
+.range-result-chart.range-7d .range-bar-label,
+.range-result-chart.range-90d .range-bar-label,
+.range-result-chart.range-all .range-bar-label {
+  white-space: nowrap;
 }
 .range-bars-summary {
   display: grid;
@@ -448,9 +448,9 @@ label { color: #b5c1c4; display: flex; align-items: center; gap: 8px; }
 .range-bars-summary strong {
   display: block;
   margin-top: 4px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
   font-size: 13px;
 }
 .distribution { display:grid; grid-template-columns: 160px 1fr; gap: 20px; align-items:center; }
@@ -628,6 +628,15 @@ label { color: #b5c1c4; display: flex; align-items: center; gap: 8px; }
 
 .chart-layout {
   grid-template-columns: minmax(0, 1.65fr) minmax(300px, 1fr);
+}
+
+.chart-layout.performance-wide-layout {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.chart-layout.performance-wide-layout .performance-chart-card,
+.chart-layout.performance-wide-layout .range-result-card {
+  grid-column: 1 / -1;
 }
 
 .three-col {
@@ -1771,11 +1780,13 @@ body.data-refreshing .live-badge {
 
   .range-bars-plot {
     height: 210px;
-    min-width: max(100%, calc(var(--bucket-count) * 34px));
+    min-width: max(100%, calc(var(--bucket-count) * 58px));
+    grid-template-columns: repeat(var(--bucket-count), minmax(48px, 1fr));
   }
 
   .range-result-chart.compact .range-bars-plot {
-    min-width: calc(var(--bucket-count) * 26px);
+    min-width: calc(var(--bucket-count) * 48px);
+    grid-template-columns: repeat(var(--bucket-count), minmax(42px, 1fr));
   }
 
   .range-bars-summary {

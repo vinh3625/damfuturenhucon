@@ -1552,14 +1552,22 @@ function renderPerformance() {
 
 function ensurePerformanceLayout() {
   const lineChart = document.getElementById('lineChart');
+  const resultBars = document.getElementById('weeklyBars');
+  const chartLayout = lineChart?.closest('.chart-layout') || resultBars?.closest('.chart-layout');
+  const linePanel = lineChart?.closest('.panel');
+  const resultPanel = resultBars?.closest('.panel');
   const lineTitle = lineChart?.closest('.panel')?.querySelector('.panel-title');
   if (lineTitle) lineTitle.textContent = `↗ ${getPerformanceTitle()}`;
-  const weeklyTitle = document.getElementById('weeklyBars')?.closest('.panel')?.querySelector('.panel-title');
+  const weeklyTitle = resultBars?.closest('.panel')?.querySelector('.panel-title');
   if (weeklyTitle) weeklyTitle.textContent = `▮ ${getRangeResultTitle()}`;
   const distributionTitle = document.getElementById('distribution')?.closest('.panel')?.querySelector('.panel-title');
   if (distributionTitle) distributionTitle.textContent = '◔ Phân bổ kết quả cuối';
   lineChart?.classList.add('performance-overview-chart');
-  lineChart?.closest('.panel')?.classList.add('performance-overview-panel');
+  linePanel?.classList.add('performance-overview-panel', 'performance-chart-card');
+  resultPanel?.classList.add('range-result-card');
+  chartLayout?.classList.add('performance-main-grid');
+  chartLayout?.classList.toggle('performance-wide-layout', selectedTimeRange !== '1D');
+  chartLayout?.classList.toggle('performance-range-1d', selectedTimeRange === '1D');
   if (lineChart && !document.getElementById('performanceOverviewStats')) {
     const stats = document.createElement('div');
     stats.id = 'performanceOverviewStats';
@@ -1795,23 +1803,23 @@ function renderRangeResultBars(buckets, range = selectedTimeRange) {
   const worst = buckets.reduce((loser, bucket) => safeNumber(bucket.r) < safeNumber(loser.r) ? bucket : loser, buckets[0] || { label: '--', r: 0 });
   const compact = buckets.length > 13 ? ' compact' : '';
   const single = buckets.length === 1 ? ' single' : '';
+  const rangeClass = ` range-${safeStatus(range).toLowerCase() || 'all'}`;
 
   target.innerHTML = `
-    <div class="range-result-chart${compact}${single}">
+    <div class="range-result-chart${compact}${single}${rangeClass}">
       <div class="range-bars-eyebrow">Kết quả theo mốc thời gian</div>
       <div class="range-bars-scroll">
         <div class="range-bars-plot" style="--bucket-count:${Math.max(1, buckets.length)}">
-          <div class="range-zero-line"></div>
           ${buckets.map(bucket => {
             const value = safeNumber(bucket.r);
             const isPositive = value > 0;
             const isNegative = value < 0;
-            const height = value === 0 ? 2 : Math.max(6, Math.abs(value) / maxAbs * 46);
+            const height = value === 0 ? 3 : Math.max(8, Math.abs(value) / maxAbs * 88);
             const label = !compact && value !== 0 ? `<span class="range-bar-r-label ${isNegative ? 'negative' : 'positive'}">${fmtR(value)}</span>` : '';
-            return `<div class="range-bar-column" title="${escapeHtml(rangeBucketTooltip(bucket))}">
+            return `<div class="range-bar-column" aria-label="${escapeHtml(rangeBucketTooltip(bucket))}">
               ${label}
               <div class="range-bar-track">
-                <span class="range-bar-fill ${isPositive ? 'positive' : isNegative ? 'negative' : 'zero'}" style="${isPositive ? `bottom:50%;height:${height}%` : isNegative ? `top:50%;height:${height}%` : 'top:calc(50% - 1px);height:2px'}"></span>
+                <span class="range-bar-fill ${isPositive ? 'positive' : isNegative ? 'negative' : 'zero'}" style="bottom:0;height:${height}%"></span>
               </div>
               <div class="range-bar-label">${escapeHtml(bucket.label)}</div>
             </div>`;
