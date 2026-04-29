@@ -1559,7 +1559,10 @@ function ensurePerformanceLayout() {
   const lineTitle = lineChart?.closest('.panel')?.querySelector('.panel-title');
   if (lineTitle) lineTitle.textContent = `↗ ${getPerformanceTitle()}`;
   const weeklyTitle = resultBars?.closest('.panel')?.querySelector('.panel-title');
-  if (weeklyTitle) weeklyTitle.textContent = `▮ ${getRangeResultTitle()}`;
+  if (weeklyTitle) {
+    weeklyTitle.textContent = `▮ ${getRangeResultTitle()}`;
+    weeklyTitle.classList.add('range-result-external-title');
+  }
   const distributionTitle = document.getElementById('distribution')?.closest('.panel')?.querySelector('.panel-title');
   if (distributionTitle) distributionTitle.textContent = '◔ Phân bổ kết quả cuối';
   lineChart?.classList.add('performance-overview-chart');
@@ -1791,12 +1794,111 @@ function rangeBucketTooltip(bucket) {
   ].join('\n');
 }
 
+function getNiceAxisMax(maxAbsR) {
+  const value = Number(maxAbsR);
+  if (!Number.isFinite(value) || value <= 0) return 1;
+
+  const padded = value * 1.12;
+  const magnitude = Math.pow(10, Math.floor(Math.log10(padded)));
+  const normalized = padded / magnitude;
+  const niceSteps = [0.5, 1, 1.5, 2, 3, 5, 10];
+  const step = niceSteps.find(item => normalized <= item) || 10;
+  return Math.max(0.5, roundR(step * magnitude));
+}
+
+function buildYAxisTicks(axisMax) {
+  const max = Number(axisMax);
+  if (!Number.isFinite(max) || max <= 0) return [0, 1];
+  let divisions = 4;
+  if (max <= 0.5) divisions = 1;
+  else if (max <= 1.5) divisions = Math.round(max / 0.5);
+  else if (max <= 2) divisions = 4;
+  else if (max === 3) divisions = 3;
+  else if (max <= 5) divisions = 5;
+  return Array.from({ length: divisions + 1 }, (_, index) => roundR((max / divisions) * index));
+}
+
+function formatAxisTickR(value, axisMax) {
+  const number = safeNumber(value);
+  if (number === 0) return '0R';
+  if (axisMax <= 2) return `${number.toFixed(1)}R`;
+  return `${Number.isInteger(number) ? number : number.toFixed(1)}R`;
+}
+
+function shouldShowRangeXAxisLabel(index, total, range) {
+  if (total <= 13) return true;
+  if (range === '30D') return index % 3 === 0 || index === total - 1;
+  const interval = Math.max(1, Math.ceil(total / 12));
+  return index % interval === 0 || index === total - 1;
+}
+
+function renderRangeResultAxisChart(buckets, range = selectedTimeRange) {
+  const rows = arr(buckets);
+  const maxAbs = Math.max(0, ...rows.map(bucket => Math.abs(safeNumber(bucket.r))));
+  const axisMax = getNiceAxisMax(maxAbs);
+  const ticks = buildYAxisTicks(axisMax);
+  const margin = { top: 34, right: 26, bottom: range === '30D' ? 78 : 68, left: 74 };
+  const height = 360;
+  const slotWidth = range === '30D' ? 42 : range === '90D' ? 70 : range === '1D' ? 190 : 86;
+  const baseWidth = range === '1D' ? 420 : 780;
+  const width = Math.max(baseWidth, rows.length * slotWidth + margin.left + margin.right);
+  const plotWidth = width - margin.left - margin.right;
+  const plotHeight = height - margin.top - margin.bottom;
+  const bottomY = margin.top + plotHeight;
+  const slot = plotWidth / Math.max(1, rows.length);
+  const barWidth = Math.min(range === '30D' ? 18 : 34, Math.max(8, slot * 0.42));
+  const xAxisLabelY = height - 10;
+  const yAxisLabelX = 16;
+  const yAxisLabelY = margin.top + plotHeight / 2;
+
+  const grid = ticks.map(tick => {
+    const y = bottomY - (safeNumber(tick) / axisMax) * plotHeight;
+    return `<g class="range-axis-tick">
+      <line class="range-axis-grid" x1="${margin.left}" y1="${y}" x2="${width - margin.right}" y2="${y}"></line>
+      <text class="range-axis-y-text" x="${margin.left - 12}" y="${y + 4}" text-anchor="end">${escapeHtml(formatAxisTickR(tick, axisMax))}</text>
+    </g>`;
+  }).join('');
+
+  const bars = rows.map((bucket, index) => {
+    const value = safeNumber(bucket.r);
+    const absValue = Math.abs(value);
+    const isPositive = value > 0;
+    const isNegative = value < 0;
+    const barHeight = value === 0 ? 3 : Math.max(6, (absValue / axisMax) * plotHeight);
+    const x = margin.left + index * slot + (slot - barWidth) / 2;
+    const y = bottomY - barHeight;
+    const labelY = Math.max(16, y - 8);
+    const centerX = x + barWidth / 2;
+    const xLabel = shouldShowRangeXAxisLabel(index, rows.length, range)
+      ? `<text class="range-axis-x-text" x="${centerX}" y="${bottomY + 24}" text-anchor="middle">${escapeHtml(bucket.label || '--')}</text>`
+      : '';
+    const valueLabel = value !== 0
+      ? `<text class="range-axis-value ${isNegative ? 'negative' : 'positive'}" x="${centerX}" y="${labelY}" text-anchor="middle">${escapeHtml(fmtR(value))}</text>`
+      : '';
+    return `<g class="range-axis-bar-group" role="img" aria-label="${escapeHtml(rangeBucketTooltip(bucket))}">
+      ${valueLabel}
+      <rect class="range-axis-bar ${isPositive ? 'positive' : isNegative ? 'negative' : 'zero'}" x="${x}" y="${y}" width="${barWidth}" height="${barHeight}" rx="5"></rect>
+      ${xLabel}
+    </g>`;
+  }).join('');
+
+  return `<div class="range-axis-scroll">
+    <svg class="range-result-axis-chart" viewBox="0 0 ${width} ${height}" style="min-width:${width}px" role="img" aria-label="${escapeHtml(getRangeResultTitle(range))}">
+      ${grid}
+      <line class="range-axis-line" x1="${margin.left}" y1="${margin.top}" x2="${margin.left}" y2="${bottomY}"></line>
+      <line class="range-axis-line" x1="${margin.left}" y1="${bottomY}" x2="${width - margin.right}" y2="${bottomY}"></line>
+      <text class="range-axis-title y" x="${yAxisLabelX}" y="${yAxisLabelY}" transform="rotate(-90 ${yAxisLabelX} ${yAxisLabelY})">Độ lớn R</text>
+      <text class="range-axis-title x" x="${margin.left + plotWidth / 2}" y="${xAxisLabelY}" text-anchor="middle">Thời gian</text>
+      ${bars}
+    </svg>
+  </div>`;
+}
+
 function renderRangeResultBars(buckets, range = selectedTimeRange) {
   const target = document.getElementById('weeklyBars');
   if (!target) return;
   target.classList.add('range-result-bars');
 
-  const maxAbs = Math.max(1, ...buckets.map(bucket => Math.abs(safeNumber(bucket.r))));
   const totalR = roundR(buckets.reduce((sum, bucket) => sum + safeNumber(bucket.r), 0));
   const totalTrades = buckets.reduce((sum, bucket) => sum + safeNumber(bucket.trades), 0);
   const best = buckets.reduce((winner, bucket) => safeNumber(bucket.r) > safeNumber(winner.r) ? bucket : winner, buckets[0] || { label: '--', r: 0 });
@@ -1807,25 +1909,11 @@ function renderRangeResultBars(buckets, range = selectedTimeRange) {
 
   target.innerHTML = `
     <div class="range-result-chart${compact}${single}${rangeClass}">
-      <div class="range-bars-eyebrow">Kết quả theo mốc thời gian</div>
-      <div class="range-bars-scroll">
-        <div class="range-bars-plot" style="--bucket-count:${Math.max(1, buckets.length)}">
-          ${buckets.map(bucket => {
-            const value = safeNumber(bucket.r);
-            const isPositive = value > 0;
-            const isNegative = value < 0;
-            const height = value === 0 ? 3 : Math.max(8, Math.abs(value) / maxAbs * 88);
-            const label = !compact && value !== 0 ? `<span class="range-bar-r-label ${isNegative ? 'negative' : 'positive'}">${fmtR(value)}</span>` : '';
-            return `<div class="range-bar-column" aria-label="${escapeHtml(rangeBucketTooltip(bucket))}">
-              ${label}
-              <div class="range-bar-track">
-                <span class="range-bar-fill ${isPositive ? 'positive' : isNegative ? 'negative' : 'zero'}" style="bottom:0;height:${height}%"></span>
-              </div>
-              <div class="range-bar-label">${escapeHtml(bucket.label)}</div>
-            </div>`;
-          }).join('')}
-        </div>
+      <div class="range-result-header">
+        <div class="range-result-title">${escapeHtml(getRangeResultTitle(range))}</div>
+        <div class="range-result-subtitle">Biểu đồ cột theo mốc thời gian</div>
       </div>
+      <div class="range-result-plot">${renderRangeResultAxisChart(buckets, range)}</div>
       <div class="range-bars-summary">
         <div><span>Tổng R</span><strong class="${totalR < 0 ? 'num-red' : totalR > 0 ? 'num-green' : ''}">${fmtR(totalR)}</strong></div>
         <div><span>Số lệnh</span><strong>${safeNumber(totalTrades)}</strong></div>
