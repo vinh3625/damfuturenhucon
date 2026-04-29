@@ -945,6 +945,56 @@ function renderHeader() {
   document.querySelector('h1').textContent = DISPLAY_BRAND_NAME;
   ensureHeaderRangeFilter();
   updateRangeFilterButtons();
+  renderActiveSignalBanner();
+}
+
+function ensureActiveSignalBanner() {
+  const header = document.querySelector('.app-header');
+  if (!header || document.getElementById('activeSignalBanner')) return;
+  header.insertAdjacentHTML('afterend', '<section id="activeSignalBanner" class="active-signal-banner" hidden></section>');
+}
+
+function activeSignalForBanner() {
+  return arr(dashboardData?.active_trades).find(trade => !isClosedTrade(trade)) || null;
+}
+
+function activeBannerMetric(label, value, cls = '') {
+  return `<div class="active-banner-metric"><span>${label}</span><strong class="${cls}">${safe(value)}</strong></div>`;
+}
+
+function renderActiveSignalBanner() {
+  ensureActiveSignalBanner();
+  const banner = document.getElementById('activeSignalBanner');
+  if (!banner) return;
+
+  const trade = activeSignalForBanner();
+  if (!trade) {
+    banner.hidden = true;
+    banner.innerHTML = '';
+    return;
+  }
+
+  const symbol = safe(trade.symbol);
+  const direction = safe(trade.direction);
+  const directionClass = direction === 'LONG' ? 'long' : direction === 'SHORT' ? 'short' : 'info';
+  banner.hidden = false;
+  banner.innerHTML = `
+    <div class="active-banner-head">
+      <span class="state-dot green"></span>
+      <span>Tín hiệu đang chạy</span>
+      <strong>${symbol}</strong>
+      <span class="badge ${directionClass}">${direction}</span>
+    </div>
+    <div class="active-banner-grid">
+      ${activeBannerMetric('Khung', trade.timeframe)}
+      ${activeBannerMetric('Entry', formatMaybePrice(trade.entry))}
+      ${activeBannerMetric('SL', formatMaybePrice(trade.sl), 'num-red')}
+      ${activeBannerMetric('TP1', formatMaybePrice(trade.tp1), 'num-cyan')}
+      ${activeBannerMetric('TP2', formatMaybePrice(trade.tp2), 'num-green')}
+      ${activeBannerMetric('R:R', formatRiskReward(trade), 'num-cyan')}
+      ${activeBannerMetric('Độ tự tin', safe(trade.confidence), 'num-green')}
+      ${activeBannerMetric('Trạng thái', safe(trade.status, 'Đang chạy'), 'num-green')}
+    </div>`;
 }
 
 function ensureSystemTab() {
@@ -1084,12 +1134,16 @@ function ensureHomeLayout() {
   const activePanel = activeTradesBody?.closest('.panel');
   const livePanel = document.getElementById('livePanelList')?.closest('.panel');
   const bottomGrid = document.getElementById('recentResults')?.closest('.two-col');
+  const recentPanel = document.getElementById('recentResults')?.closest('.panel');
+  const shortLogsPanel = document.getElementById('shortLogs')?.closest('.panel');
   const riskBanner = home?.querySelector('.risk-banner');
 
+  shortLogsPanel?.remove();
   activeGrid?.classList.add('home-active-grid');
   activePanel?.classList.add('home-active-panel');
   livePanel?.classList.add('home-live-panel');
-  bottomGrid?.classList.add('home-bottom-grid');
+  recentPanel?.classList.add('home-results-panel');
+  bottomGrid?.classList.add('home-bottom-grid', 'home-results-only');
   riskBanner?.classList.add('home-risk-hidden');
 
   document.getElementById('homeAnalyticsGrid')?.remove();
@@ -1187,7 +1241,7 @@ function renderSignalDistribution(targetId, { showTotalLine = false } = {}) {
       <div class="home-donut-inner"><strong>${distributionTotal}</strong><span>Lệnh đóng</span></div>
     </div>
     <div class="home-distribution-legend">
-      ${items.map(item => `<div class="home-legend-item"><span class="dot" style="background:${item.color}"></span><span>${item.label}</span><strong class="${item.cls}">${safeNumber(item.count)} (${formatPercent(percentOf(item.count, distributionTotal))})</strong></div>`).join('')}
+      ${items.map(item => `<div class="home-legend-item"><span class="dot" style="background:${item.color}"></span><span class="home-legend-label">${item.label}</span><strong class="${item.cls}">${safeNumber(item.count)}</strong><span class="home-legend-percent">${formatPercent(percentOf(item.count, distributionTotal))}</span></div>`).join('')}
     </div>
     ${showTotalLine ? `<div class="distribution-total-line">Lệnh đóng: <strong>${distributionTotal}</strong></div>` : ''}`;
 }
@@ -1219,12 +1273,21 @@ function renderHomeSignalStats() {
 function renderRecentResults() {
   const recentResults = recentResultsForHome();
   document.getElementById('recentResults').innerHTML = recentResults.length
-    ? recentResults.map(r => {
+    ? `<div class="recent-results-table">
+        <div class="recent-results-head"><span>Thời gian</span><span>Cặp</span><span>Hướng</span><span>Kết quả</span><span>R</span></div>
+        ${recentResults.map(r => {
       const result = formatResultDisplay(r, { includePrice: true });
       const outcome = normalizeResult(r) || compactResultLabel(r.result);
       const rValue = readTradeR(r);
-      return `<div class="result-row"><strong><span class="coin-icon" style="width:28px;height:28px;font-size:14px;margin-right:8px">${iconFor(r.symbol)}</span>${safe(r.symbol)}</strong><span class="${clsDir(r.direction)}">${safe(r.direction)}</span><strong class="${outcome === 'SL' ? 'num-red' : outcome === 'Thoát sớm' ? 'num-cyan' : 'num-green'}">${safe(result)}</strong><strong class="${safeNumber(rValue) < 0 ? 'num-red' : 'num-green'}">${rValue === null ? '--' : fmtR(rValue)}</strong></div>`;
-    }).join('')
+      return `<div class="recent-result-row">
+        <span class="timeline-time">${formatSystemLogTime(r)}</span>
+        <strong><span class="coin-icon" style="width:28px;height:28px;font-size:14px;margin-right:8px">${iconFor(r.symbol)}</span>${safe(r.symbol)}</strong>
+        <span><span class="badge ${clsDir(r.direction)}">${safe(r.direction)}</span></span>
+        <strong class="${outcome === 'SL' ? 'num-red' : outcome === 'Thoát sớm' ? 'num-cyan' : 'num-green'}">${safe(result)}</strong>
+        <strong class="${safeNumber(rValue) < 0 ? 'num-red' : 'num-green'}">${rValue === null ? '--' : fmtR(rValue)}</strong>
+      </div>`;
+    }).join('')}
+      </div>`
     : '<div class="empty-state">Chưa có kết quả gần đây</div>';
 }
 
@@ -1250,8 +1313,10 @@ function recentResultsForHome() {
 }
 
 function renderShortLogs() {
+  const target = document.getElementById('shortLogs');
+  if (!target) return;
   const logs = shortLogsForHome();
-  document.getElementById('shortLogs').innerHTML = logs.length
+  target.innerHTML = logs.length
     ? logs.map(logRow).join('')
     : '<div class="empty-state">Chưa có nhật ký bot</div>';
 }
