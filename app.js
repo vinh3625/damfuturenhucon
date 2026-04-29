@@ -1682,11 +1682,12 @@ function renderLineChart(targetId = 'lineChart') {
   const lastR = safeNumber(last.r);
   const isNegative = lastR < 0;
   const isPositive = lastR > 0;
+  const areaClass = isNegative ? 'negative' : isPositive ? 'positive' : 'neutral';
   const tagFill = isNegative ? 'rgba(255,77,79,.18)' : isPositive ? 'rgba(103,240,92,.18)' : 'rgba(180,195,200,.14)';
   const tagStroke = isNegative ? 'rgba(255,77,79,.8)' : isPositive ? 'rgba(103,240,92,.8)' : 'rgba(180,195,200,.55)';
   const tagText = isNegative ? '#ff4d4f' : isPositive ? '#67f05c' : '#cbd5d4';
 
-  target.innerHTML = `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">${grid}<polygon class="performance-area" points="${area}"/><polyline class="performance-line" points="${pts}"/>${markers}<line class="chart-grid" stroke-dasharray="5 5" x1="${padL}" x2="${w-padR+14}" y1="${y(0)}" y2="${y(0)}"/>${labels}<rect x="${bx}" y="${by}" width="70" height="26" rx="9" fill="${tagFill}" stroke="${tagStroke}"/><text x="${bx+8}" y="${by+18}" fill="${tagText}" font-size="15" font-weight="800">${fmtR(last.r)}</text></svg>`;
+  target.innerHTML = `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">${grid}<polygon class="performance-area ${areaClass}" points="${area}"/><polyline class="performance-line" points="${pts}"/>${markers}<line class="chart-grid" stroke-dasharray="5 5" x1="${padL}" x2="${w-padR+14}" y1="${y(0)}" y2="${y(0)}"/>${labels}<rect x="${bx}" y="${by}" width="70" height="26" rx="9" fill="${tagFill}" stroke="${tagStroke}"/><text x="${bx+8}" y="${by+18}" fill="${tagText}" font-size="15" font-weight="800">${fmtR(last.r)}</text></svg>`;
 }
 
 function performancePointLabel(point = {}) {
