@@ -375,6 +375,25 @@ function getVietnamStartOfToday(date = getVietnamNow()) {
   return createVietnamDate(parts.year, parts.month, parts.day);
 }
 
+function getVietnamStartOfDay(date = getVietnamNow()) {
+  const parts = getVietnamDateParts(date);
+  return createVietnamDate(parts.year, parts.month, parts.day);
+}
+
+function addVietnamDays(date, days) {
+  return new Date(date.getTime() + days * MS_PER_DAY);
+}
+
+function getVietnamStartOfMonth(date = getVietnamNow()) {
+  const parts = getVietnamDateParts(date);
+  return createVietnamDate(parts.year, parts.month, 1);
+}
+
+function addVietnamMonths(date, months) {
+  const parts = getVietnamDateParts(date);
+  return createVietnamDate(parts.year, parts.month + months, 1);
+}
+
 function getRangeStartDate(range) {
   if (range === 'ALL') return null;
   const daysBack = { '1D': 0, '7D': 6, '30D': 29, '90D': 89 }[range];
@@ -1536,7 +1555,7 @@ function ensurePerformanceLayout() {
   const lineTitle = lineChart?.closest('.panel')?.querySelector('.panel-title');
   if (lineTitle) lineTitle.textContent = `↗ ${getPerformanceTitle()}`;
   const weeklyTitle = document.getElementById('weeklyBars')?.closest('.panel')?.querySelector('.panel-title');
-  if (weeklyTitle) weeklyTitle.textContent = `▮ ${getResultPeriodTitle()}`;
+  if (weeklyTitle) weeklyTitle.textContent = `▮ ${getRangeResultTitle()}`;
   const distributionTitle = document.getElementById('distribution')?.closest('.panel')?.querySelector('.panel-title');
   if (distributionTitle) distributionTitle.textContent = '◔ Phân bổ kết quả cuối';
   lineChart?.classList.add('performance-overview-chart');
@@ -1613,32 +1632,204 @@ function performancePointLabel(point = {}) {
   return formatDateVN(firstValue(point.date, point.time, point.created_at));
 }
 
-function formatWeekDate(value) {
-  return formatDateVN(value);
+function getRangeResultTitle(range = selectedTimeRange) {
+  return {
+    '1D': 'Kết quả hôm nay',
+    '7D': 'Kết quả 7 ngày',
+    '30D': 'Kết quả 30 ngày',
+    '90D': 'Kết quả 90 ngày',
+    ALL: 'Kết quả toàn thời gian'
+  }[range] || 'Kết quả theo mốc thời gian';
 }
 
-function weeklyLabelHtml(week = {}) {
-  const [rangeStart = '--', rangeEnd = '--'] = safeStatus(week.range).split(/\s+-\s+/);
-  const start = week.start_date || rangeStart;
-  const end = week.end_date || rangeEnd;
-  const summary = safeStatus(week.result_summary);
-  return `<div class="bar-label">
-    <span>${safe(week.label)}</span>
-    ${summary ? `<span>${summary}</span>` : ''}
-    ${start !== '--' ? `<span class="bar-separator">•</span><span>${formatWeekDate(start)}</span>` : ''}
-    ${end !== '--' && end !== start ? `<span class="bar-separator">-</span><span>${formatWeekDate(end)}</span>` : ''}
-  </div>`;
+function getTradeCloseTime(trade) {
+  return trade.closed_at
+    || trade.closed_at_iso
+    || trade.time
+    || trade.created_at_iso
+    || trade.opened_at
+    || trade.opened_at_iso
+    || trade.created_at
+    || null;
+}
+
+function getTradeR(trade) {
+  const value = Number(trade.r);
+  if (Number.isFinite(value)) return value;
+  const parsed = readTradeR(trade);
+  return parsed !== null ? parsed : 0;
+}
+
+function rangeResultTrades() {
+  return resultRowsForStats(dashboardData?.trade_journal, dashboardData?.recent_results)
+    .filter(trade => parseDashboardTime(getTradeCloseTime(trade), trade) !== null);
+}
+
+function emptyRangeBucket(key, label, start, end, tooltipLabel = label) {
+  return {
+    key,
+    label,
+    tooltipLabel,
+    start,
+    end,
+    r: 0,
+    trades: 0,
+    wins: 0,
+    losses: 0,
+    tp1: 0,
+    tp2: 0,
+    sl: 0
+  };
+}
+
+function buildTimeBucketsForRange(range, now = new Date(), trades = []) {
+  const todayStart = getVietnamStartOfDay(now);
+  const buckets = [];
+
+  if (range === '1D') {
+    const start = todayStart;
+    const end = now;
+    return [emptyRangeBucket('today', 'Hôm nay', start, end, formatDateVN(start))];
+  }
+
+  if (range === '7D' || range === '30D') {
+    const days = range === '7D' ? 7 : 30;
+    const firstDay = addVietnamDays(todayStart, -(days - 1));
+    for (let index = 0; index < days; index += 1) {
+      const start = addVietnamDays(firstDay, index);
+      const nextDay = addVietnamDays(start, 1);
+      const end = index === days - 1 ? now : nextDay;
+      const label = range === '30D' ? formatDayMonthVN(start) : formatDateVN(start);
+      buckets.push(emptyRangeBucket(formatDateKeyVN(start), label, start, end, formatDateVN(start)));
+    }
+    return buckets;
+  }
+
+  if (range === '90D') {
+    const firstDay = addVietnamDays(todayStart, -89);
+    for (let index = 0; index < 13; index += 1) {
+      const start = addVietnamDays(firstDay, index * 7);
+      if (start > now) break;
+      const end = index === 12 ? now : new Date(Math.min(addVietnamDays(start, 7).getTime(), now.getTime()));
+      const from = formatDayMonthVN(start);
+      const to = index === 12 ? formatDayMonthVN(end) : formatDayMonthVN(addVietnamDays(end, -1));
+      const weekOffset = 12 - index;
+      const label = weekOffset === 0 ? 'Tuần này' : `Tuần -${weekOffset}`;
+      buckets.push(emptyRangeBucket(`week-${index}`, label, start, end, `${from} - ${to}`));
+    }
+    return buckets;
+  }
+
+  const tradeTimes = arr(trades)
+    .map(trade => parseDashboardTime(getTradeCloseTime(trade), trade))
+    .filter(time => time !== null)
+    .map(time => new Date(time));
+  const startMonth = tradeTimes.length
+    ? getVietnamStartOfMonth(new Date(Math.min(...tradeTimes.map(date => date.getTime()))))
+    : getVietnamStartOfMonth(now);
+  const lastMonth = tradeTimes.length
+    ? getVietnamStartOfMonth(new Date(Math.max(...tradeTimes.map(date => date.getTime()))))
+    : getVietnamStartOfMonth(now);
+  const currentMonth = getVietnamStartOfMonth(now);
+  const endMonth = lastMonth > currentMonth ? lastMonth : currentMonth;
+
+  let cursor = startMonth;
+  let guard = 0;
+  while (cursor <= endMonth && guard < 240) {
+    const start = cursor;
+    const next = addVietnamMonths(start, 1);
+    const end = next > now && formatMonthYearVN(start) === formatMonthYearVN(currentMonth) ? now : next;
+    buckets.push(emptyRangeBucket(formatMonthYearVN(start), formatMonthYearVN(start), start, end, formatMonthYearVN(start)));
+    cursor = next;
+    guard += 1;
+  }
+  return buckets;
+}
+
+function addTradeToRangeBucket(bucket, trade) {
+  const r = getTradeR(trade);
+  const outcome = normalizeDistributionOutcome(trade.result || trade.status || trade.label);
+  bucket.r += r;
+  bucket.trades += 1;
+  if (outcome === 'TP1') bucket.tp1 += 1;
+  if (outcome === 'TP2') bucket.tp2 += 1;
+  if (outcome === 'SL') bucket.sl += 1;
+  if (outcome === 'TP1' || outcome === 'TP2' || r > 0) bucket.wins += 1;
+  if (outcome === 'SL' || r < 0) bucket.losses += 1;
+}
+
+function buildRangeResultBuckets(trades, range = selectedTimeRange) {
+  const sourceTrades = arr(trades);
+  const buckets = buildTimeBucketsForRange(range, getVietnamNow(), sourceTrades);
+  sourceTrades.forEach(trade => {
+    const time = parseDashboardTime(getTradeCloseTime(trade), trade);
+    if (time === null) return;
+    const bucket = buckets.find(item => time >= item.start.getTime() && time < item.end.getTime());
+    if (bucket) addTradeToRangeBucket(bucket, trade);
+  });
+  return buckets.map(bucket => ({ ...bucket, r: roundR(bucket.r) }));
+}
+
+function rangeBucketTooltip(bucket) {
+  return [
+    bucket.tooltipLabel || bucket.label,
+    `Tổng R: ${fmtR(bucket.r)}`,
+    `Số lệnh: ${safeNumber(bucket.trades)}`,
+    `TP1: ${safeNumber(bucket.tp1)}`,
+    `TP2: ${safeNumber(bucket.tp2)}`,
+    `SL: ${safeNumber(bucket.sl)}`,
+    `Win: ${safeNumber(bucket.wins)}`,
+    `Loss: ${safeNumber(bucket.losses)}`
+  ].join('\n');
+}
+
+function renderRangeResultBars(buckets, range = selectedTimeRange) {
+  const target = document.getElementById('weeklyBars');
+  if (!target) return;
+  target.classList.add('range-result-bars');
+
+  const maxAbs = Math.max(1, ...buckets.map(bucket => Math.abs(safeNumber(bucket.r))));
+  const totalR = roundR(buckets.reduce((sum, bucket) => sum + safeNumber(bucket.r), 0));
+  const totalTrades = buckets.reduce((sum, bucket) => sum + safeNumber(bucket.trades), 0);
+  const best = buckets.reduce((winner, bucket) => safeNumber(bucket.r) > safeNumber(winner.r) ? bucket : winner, buckets[0] || { label: '--', r: 0 });
+  const worst = buckets.reduce((loser, bucket) => safeNumber(bucket.r) < safeNumber(loser.r) ? bucket : loser, buckets[0] || { label: '--', r: 0 });
+  const compact = buckets.length > 13 ? ' compact' : '';
+  const single = buckets.length === 1 ? ' single' : '';
+
+  target.innerHTML = `
+    <div class="range-result-chart${compact}${single}">
+      <div class="range-bars-eyebrow">Kết quả theo mốc thời gian</div>
+      <div class="range-bars-scroll">
+        <div class="range-bars-plot" style="--bucket-count:${Math.max(1, buckets.length)}">
+          <div class="range-zero-line"></div>
+          ${buckets.map(bucket => {
+            const value = safeNumber(bucket.r);
+            const isPositive = value > 0;
+            const isNegative = value < 0;
+            const height = value === 0 ? 2 : Math.max(6, Math.abs(value) / maxAbs * 46);
+            const label = !compact && value !== 0 ? `<span class="range-bar-r-label ${isNegative ? 'negative' : 'positive'}">${fmtR(value)}</span>` : '';
+            return `<div class="range-bar-column" title="${escapeHtml(rangeBucketTooltip(bucket))}">
+              ${label}
+              <div class="range-bar-track">
+                <span class="range-bar-fill ${isPositive ? 'positive' : isNegative ? 'negative' : 'zero'}" style="${isPositive ? `bottom:50%;height:${height}%` : isNegative ? `top:50%;height:${height}%` : 'top:calc(50% - 1px);height:2px'}"></span>
+              </div>
+              <div class="range-bar-label">${escapeHtml(bucket.label)}</div>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>
+      <div class="range-bars-summary">
+        <div><span>Tổng R</span><strong class="${totalR < 0 ? 'num-red' : totalR > 0 ? 'num-green' : ''}">${fmtR(totalR)}</strong></div>
+        <div><span>Số lệnh</span><strong>${safeNumber(totalTrades)}</strong></div>
+        <div><span>Tốt nhất</span><strong class="${safeNumber(best.r) > 0 ? 'num-green' : ''}">${escapeHtml(best.label || '--')} · ${fmtR(best.r)}</strong></div>
+        <div><span>Xấu nhất</span><strong class="${safeNumber(worst.r) < 0 ? 'num-red' : ''}">${escapeHtml(worst.label || '--')} · ${fmtR(worst.r)}</strong></div>
+      </div>
+    </div>`;
 }
 
 function renderWeeklyBars() {
-  const weeklyResults = resultPeriodsForBars();
-  const max = Math.max(1, ...weeklyResults.map(w => Math.abs(Number(w.r) || 0)));
-  document.getElementById('weeklyBars').innerHTML = weeklyResults.length
-    ? weeklyResults.map(w => {
-      const value = safeNumber(w.r);
-      return `<div class="bar-item"><div class="bar-value ${value < 0 ? 'num-red' : 'num-green'}">${fmtR(value)}</div><div class="bar ${value < 0 ? 'bar-negative' : ''}" style="height:${Math.max(35, (Math.abs(value)/max)*180)}px"></div>${weeklyLabelHtml(w)}</div>`;
-    }).join('')
-    : `<div class="empty-state">Chưa có ${getResultPeriodTitle().toLowerCase()}</div>`;
+  const buckets = buildRangeResultBuckets(rangeResultTrades(), selectedTimeRange);
+  renderRangeResultBars(buckets, selectedTimeRange);
 }
 
 function renderDistribution(targetId = 'distribution') {
@@ -1779,6 +1970,20 @@ function formatDateKeyVN(value, item = {}) {
   return `${parts.year}-${String(parts.month).padStart(2, '0')}-${String(parts.day).padStart(2, '0')}`;
 }
 
+function formatDayMonthVN(value) {
+  const time = parseDashboardTime(value);
+  if (time === null) return '--';
+  const parts = getVietnamDateParts(new Date(time));
+  return `${String(parts.day).padStart(2, '0')}/${String(parts.month).padStart(2, '0')}`;
+}
+
+function formatMonthYearVN(value) {
+  const time = parseDashboardTime(value);
+  if (time === null) return '--';
+  const parts = getVietnamDateParts(new Date(time));
+  return `${String(parts.month).padStart(2, '0')}/${String(parts.year % 100).padStart(2, '0')}`;
+}
+
 function roundR(value) {
   return Number(safeNumber(value).toFixed(2));
 }
@@ -1790,13 +1995,6 @@ function resultCountsForRows(rows) {
     if (counts[result] !== undefined) counts[result] += 1;
   });
   return counts;
-}
-
-function formatResultSummary(counts) {
-  return ['SL', 'TP1', 'TP2', 'Thoát sớm']
-    .filter(label => safeNumber(counts[label]) > 0)
-    .map(label => `${label}: ${safeNumber(counts[label])}`)
-    .join(' · ');
 }
 
 function closedJournalRowsWithR() {
@@ -1850,48 +2048,6 @@ function derivePerformanceSeriesFromTradeJournal() {
 function performanceSeriesForChart() {
   const existing = arr(dashboardData.performance_30d);
   return existing.length ? existing : derivePerformanceSeriesFromTradeJournal();
-}
-
-function deriveResultPeriodsFromTradeJournal() {
-  const rows = sortOldestRows(getFilteredTradeJournal()).filter(isClosedTrade);
-  if (!rows.length) return [];
-
-  if (selectedTimeRange === '1D') {
-    const counts = resultCountsForRows(rows);
-    const totalR = sumResultR(rows);
-    const todayKey = formatDateKeyVN(getVietnamNow());
-    return [{
-      label: 'Hôm nay',
-      date: todayKey,
-      start_date: todayKey,
-      end_date: todayKey,
-      r: roundR(totalR),
-      result_summary: formatResultSummary(counts)
-    }];
-  }
-
-  const groups = new Map();
-  rows.forEach(row => {
-    const key = formatDateKeyVN(row.time, row);
-    if (!key) return;
-    if (!groups.has(key)) groups.set(key, { label: formatDateVN(key), date: key, start_date: key, end_date: key, rows: [], r: 0 });
-    const group = groups.get(key);
-    group.rows.push(row);
-    group.r += readTradeR(row) ?? 0;
-  });
-
-  return Array.from(groups.values())
-    .sort((a, b) => (parseDashboardTime(a.date) ?? 0) - (parseDashboardTime(b.date) ?? 0))
-    .map(group => ({
-      ...group,
-      r: roundR(group.r),
-      result_summary: formatResultSummary(resultCountsForRows(group.rows))
-    }));
-}
-
-function resultPeriodsForBars() {
-  const existing = arr(dashboardData.weekly_results);
-  return existing.length ? existing : deriveResultPeriodsFromTradeJournal();
 }
 
 function matchesTradeJournalFilter(row) {
