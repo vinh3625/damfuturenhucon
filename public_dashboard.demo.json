@@ -91,6 +91,58 @@
       "note": "Demo pending H1 setup."
     },
     {
+      "signal_id": "doge-demo-2",
+      "order_id": "DOGE-20260429-0940",
+      "symbol": "DOGEUSDT",
+      "direction": "LONG",
+      "system": "SNIPER_M5",
+      "timeframe": "M5",
+      "entry": 0.09994,
+      "sl": 0.09975,
+      "tp1": 0.100128,
+      "tp2": null,
+      "status": "Đã đóng",
+      "result": "TP2",
+      "r": 0.8,
+      "exit_price": 0.10013,
+      "close_price": 0.10013,
+      "confidence": 77,
+      "created_at": "29/04/2026 09:40",
+      "created_at_iso": "2026-04-29T09:40:00+07:00",
+      "opened_at": "2026-04-29T09:40:00+07:00",
+      "closed_at": "2026-04-29T10:17:00+07:00",
+      "date": "29/04/2026",
+      "time": "09:40",
+      "display_time": "29/04/2026 09:40",
+      "note": "Demo TP2 result while planned TP2 is missing."
+    },
+    {
+      "signal_id": "doge-demo-1",
+      "order_id": "DOGE-20260429-0845",
+      "symbol": "DOGEUSDT",
+      "direction": "LONG",
+      "system": "SNIPER_M5",
+      "timeframe": "M5",
+      "entry": 0.09972,
+      "sl": 0.0995,
+      "tp1": 0.09994,
+      "tp2": 0,
+      "status": "Đã đóng",
+      "result": "TP2",
+      "r": 0.7,
+      "exit_price": 0.09994,
+      "close_price": 0.09994,
+      "confidence": 75,
+      "created_at": "29/04/2026 08:45",
+      "created_at_iso": "2026-04-29T08:45:00+07:00",
+      "opened_at": "2026-04-29T08:45:00+07:00",
+      "closed_at": "2026-04-29T09:12:00+07:00",
+      "date": "29/04/2026",
+      "time": "08:45",
+      "display_time": "29/04/2026 08:45",
+      "note": "Demo second DOGE order with different entry/open time."
+    },
+    {
       "symbol": "DOGEUSDT",
       "direction": "LONG",
       "system": "SNIPER_M5",
@@ -211,6 +263,40 @@
   ],
   "recent_results": [
     {
+      "signal_id": "doge-demo-2",
+      "order_id": "DOGE-20260429-0940",
+      "symbol": "DOGEUSDT",
+      "direction": "LONG",
+      "timeframe": "M5",
+      "entry": 0.09994,
+      "tp1": 0.100128,
+      "tp2": null,
+      "result": "TP2",
+      "r": 0.8,
+      "exit_price": 0.10013,
+      "close_price": 0.10013,
+      "opened_at": "2026-04-29T09:40:00+07:00",
+      "closed_at": "2026-04-29T10:17:00+07:00",
+      "time": "2026-04-29T10:17:00+07:00"
+    },
+    {
+      "signal_id": "doge-demo-1",
+      "order_id": "DOGE-20260429-0845",
+      "symbol": "DOGEUSDT",
+      "direction": "LONG",
+      "timeframe": "M5",
+      "entry": 0.09972,
+      "tp1": 0.09994,
+      "tp2": 0,
+      "result": "TP2",
+      "r": 0.7,
+      "exit_price": 0.09994,
+      "close_price": 0.09994,
+      "opened_at": "2026-04-29T08:45:00+07:00",
+      "closed_at": "2026-04-29T09:12:00+07:00",
+      "time": "2026-04-29T09:12:00+07:00"
+    },
+    {
       "symbol": "XRPUSDT",
       "direction": "LONG",
       "result": "TP1 HIT",
@@ -268,6 +354,46 @@
     }
   ],
   "trade_journal": [
+    {
+      "signal_id": "doge-demo-2",
+      "order_id": "DOGE-20260429-0940",
+      "time": "2026-04-29T10:17:00+07:00",
+      "opened_at": "2026-04-29T09:40:00+07:00",
+      "closed_at": "2026-04-29T10:17:00+07:00",
+      "symbol": "DOGEUSDT",
+      "direction": "LONG",
+      "timeframe": "M5",
+      "entry": 0.09994,
+      "sl": 0.09975,
+      "tp1": 0.100128,
+      "tp2": null,
+      "position_value": "100 USDT",
+      "status": "Đã đóng",
+      "result": "TP2",
+      "r": 0.8,
+      "exit_price": 0.10013,
+      "close_price": 0.10013
+    },
+    {
+      "signal_id": "doge-demo-1",
+      "order_id": "DOGE-20260429-0845",
+      "time": "2026-04-29T09:12:00+07:00",
+      "opened_at": "2026-04-29T08:45:00+07:00",
+      "closed_at": "2026-04-29T09:12:00+07:00",
+      "symbol": "DOGEUSDT",
+      "direction": "LONG",
+      "timeframe": "M5",
+      "entry": 0.09972,
+      "sl": 0.0995,
+      "tp1": 0.09994,
+      "tp2": 0,
+      "position_value": "100 USDT",
+      "status": "Đã đóng",
+      "result": "TP2",
+      "r": 0.7,
+      "exit_price": 0.09994,
+      "close_price": 0.09994
+    },
     {
       "time": "2026-04-29T06:12:00+07:00",
       "symbol": "TRXUSDT",
@@ -436,6 +562,24 @@
   ],
   "activity_logs": [
     {
+      "time": "10:17",
+      "time_iso": "2026-04-29T10:17:00+07:00",
+      "type": "RESULT",
+      "message": "DOGEUSDT LONG - Đã đóng"
+    },
+    {
+      "time": "10:17",
+      "time_iso": "2026-04-29T10:17:00+07:00",
+      "type": "RESULT",
+      "message": "DOGEUSDT LONG - TP2 (+0.8R)"
+    },
+    {
+      "time": "09:12",
+      "time_iso": "2026-04-29T09:12:00+07:00",
+      "type": "RESULT",
+      "message": "DOGEUSDT LONG - TP2 (+0.7R)"
+    },
+    {
       "time": "05:46",
       "time_iso": "2026-04-28T05:46:13+07:00",
       "type": "SIGNAL",
@@ -573,6 +717,24 @@
     "last_reset_at": "",
     "last_dashboard_publish": "2026-04-28T06:38:13+07:00",
     "recent_system_logs": [
+      {
+        "time": "10:17",
+        "time_iso": "2026-04-29T10:17:00+07:00",
+        "message": "DOGEUSDT LONG - Đã đóng",
+        "type": "RESULT"
+      },
+      {
+        "time": "10:17",
+        "time_iso": "2026-04-29T10:17:00+07:00",
+        "message": "DOGEUSDT LONG - TP2 (+0.8R)",
+        "type": "RESULT"
+      },
+      {
+        "time": "09:12",
+        "time_iso": "2026-04-29T09:12:00+07:00",
+        "message": "DOGEUSDT LONG - TP2 (+0.7R)",
+        "type": "RESULT"
+      },
       {
         "time": "05:46",
         "time_iso": "2026-04-28T05:46:13+07:00",

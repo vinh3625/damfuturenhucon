@@ -59,11 +59,56 @@ const fmtR = (value) => {
 const clsDir = (d) => safeStatus(d) === 'LONG' ? 'long' : 'short';
 const iconFor = (symbol = '') => coinIconMap[safeStatus(symbol).replace('USDT', '')] || '◎';
 const metricChanged = (...keys) => keys.some(key => changedMetrics.has(key));
-const readTradeNumber = (value) => {
-  if (value === undefined || value === null || value === '') return null;
+const isMissingPrice = (value) => {
+  if (value === undefined || value === null || value === '') return true;
+  if (typeof value === 'string') {
+    const text = value.trim();
+    if (!text || text === '-' || text === '--') return true;
+    value = text.replace(/,/g, '');
+  }
   const number = Number(value);
+  return !Number.isFinite(number) || number === 0;
+};
+const cleanPrice = (value) => {
+  if (isMissingPrice(value)) return null;
+  const number = Number(typeof value === 'string' ? value.replace(/,/g, '') : value);
   return Number.isFinite(number) ? number : null;
 };
+const readTradeNumber = (value) => {
+  return cleanPrice(value);
+};
+const formatMaybePrice = (value) => {
+  const number = cleanPrice(value);
+  if (number === null) return '--';
+  const abs = Math.abs(number);
+  const decimals = abs >= 100 ? 2 : abs >= 1 ? 4 : 6;
+  return number.toFixed(decimals).replace(/\.?0+$/, '');
+};
+const sanitizeRiskRewardText = (value, signal = {}) => {
+  const text = safeStatus(value);
+  if (!text || text === '--') return '';
+  return text
+    .split(/\s*[·|,]\s*/)
+    .map(part => part.trim())
+    .filter(part => {
+      if (!part) return false;
+      const upper = part.toUpperCase();
+      if (upper.includes('TP1') && isMissingPrice(signal.tp1)) return false;
+      if (upper.includes('TP2') && isMissingPrice(signal.tp2)) return false;
+      const rMatch = upper.match(/([+-]?\d+(?:\.\d+)?)\s*R/);
+      return !rMatch || Math.abs(Number(rMatch[1])) < 100;
+    })
+    .join(' · ');
+};
+const closePriceValue = (row = {}) => firstValue(
+  row.exit_price,
+  row.close_price,
+  row.fill_price,
+  row.avg_close_price,
+  row.avg_exit_price,
+  row.closed_price,
+  row.executed_price
+);
 const internalPublicTextPattern = /\b(?:SWING_M15|SNIPER_M5|SCALP_M1|MANUAL_ENTRY|TREND|PUBLIC)\b|Hệ thống|Chiến lược|Nguồn/g;
 
 function sanitizePublicText(value) {
@@ -81,23 +126,25 @@ function formatRiskReward(signal = {}) {
   const tp1 = readTradeNumber(signal.tp1);
   const tp2 = readTradeNumber(signal.tp2);
   const direction = safeStatus(signal.direction);
+  const fallbackText = sanitizeRiskRewardText(firstValue(signal.rr_text, signal.risk_reward, signal.rr_display), signal);
 
-  if ([entry, sl, tp1, tp2].some(value => value === null) || !['LONG', 'SHORT'].includes(direction)) return '--';
+  if ([entry, sl].some(value => value === null) || !['LONG', 'SHORT'].includes(direction)) return fallbackText || '--';
 
   const risk = direction === 'LONG'
     ? Math.abs(entry - sl)
     : Math.abs(sl - entry);
-  if (risk <= 0) return '--';
+  if (risk <= 0) return fallbackText || '--';
 
-  const rr1 = direction === 'LONG'
-    ? Math.abs(tp1 - entry) / risk
-    : Math.abs(entry - tp1) / risk;
-  const rr2 = direction === 'LONG'
-    ? Math.abs(tp2 - entry) / risk
-    : Math.abs(entry - tp2) / risk;
-  if (![rr1, rr2].every(Number.isFinite)) return '--';
+  const parts = [];
+  [['TP1', tp1], ['TP2', tp2]].forEach(([label, target]) => {
+    if (target === null) return;
+    const rr = direction === 'LONG'
+      ? Math.abs(target - entry) / risk
+      : Math.abs(entry - target) / risk;
+    if (Number.isFinite(rr)) parts.push(`${label} ${rr.toFixed(1)}R`);
+  });
 
-  return `TP1 ${rr1.toFixed(1)}R · TP2 ${rr2.toFixed(1)}R`;
+  return parts.length ? parts.join(' · ') : fallbackText || '--';
 }
 
 function publicLogType(type) {
@@ -106,6 +153,121 @@ function publicLogType(type) {
 
 function logFilterValue(value) {
   return value === 'status' ? 'Hệ thống' : value;
+}
+
+function canonicalTradeKey(row = {}) {
+  for (const key of ['signal_id', 'trade_id', 'order_id', 'entry_order_id', 'exchange_order_id', 'id']) {
+    const value = firstValue(row[key]);
+    if (value !== undefined && value !== null && value !== '') return `${key}:${safeStatus(value)}`;
+  }
+
+  const symbol = safeStatus(row.symbol || row.coin).toUpperCase() || '--';
+  const direction = safeStatus(row.direction || row.side).toUpperCase() || '--';
+  const timeframe = safeStatus(row.timeframe || row.tf || row.frame).toUpperCase() || '--';
+  const entry = cleanPrice(row.entry);
+  const entryText = entry === null ? '--' : String(entry);
+  const openedAt = firstValue(row.opened_at, row.opened_at_iso, row.entry_at, row.created_at_iso, row.created_at, row.called_at);
+  const fallbackTime = entry === null
+    ? firstValue(row.closed_at_iso, row.closed_at, row.time_iso, row.timestamp, row.time, row.date, row.display_time)
+    : '';
+  return ['fields', symbol, direction, timeframe, entryText, safeStatus(openedAt || fallbackTime || '--')].join('|');
+}
+
+function statusPriority(row = {}) {
+  if (isClosedTrade(row)) return 3;
+  if (isJournalRunning(row)) return 2;
+  if (isPendingHistoryRow(row)) return 1;
+  return 0;
+}
+
+function mergeTradeRows(existing = {}, incoming = {}) {
+  const preferred = statusPriority(incoming) >= statusPriority(existing) ? incoming : existing;
+  const other = preferred === incoming ? existing : incoming;
+  const merged = { ...other, ...preferred };
+  ['entry', 'sl', 'tp1', 'tp2', 'exit_price', 'close_price'].forEach(key => {
+    if (isMissingPrice(merged[key]) && !isMissingPrice(other[key])) merged[key] = other[key];
+  });
+  ['opened_at', 'opened_at_iso', 'closed_at', 'closed_at_iso', 'time', 'time_iso', 'created_at', 'created_at_iso', 'result', 'result_text', 'r'].forEach(key => {
+    if ((merged[key] === undefined || merged[key] === null || merged[key] === '') && other[key] !== undefined && other[key] !== null && other[key] !== '') {
+      merged[key] = other[key];
+    }
+  });
+  return merged;
+}
+
+function dedupeTradeRows(rows = []) {
+  const byKey = new Map();
+  arr(rows).forEach(row => {
+    const key = canonicalTradeKey(row);
+    if (!byKey.has(key)) {
+      byKey.set(key, row);
+      return;
+    }
+    byKey.set(key, mergeTradeRows(byKey.get(key), row));
+  });
+  return Array.from(byKey.values());
+}
+
+function dedupeClosedTradeRows(rows = []) {
+  return dedupeTradeRows(arr(rows).filter(isClosedTrade));
+}
+
+function resultActionLabel(result) {
+  if (result === 'TP1' || result === 'TP2') return `Chốt ${result}`;
+  if (result === 'SL') return 'Dừng lỗ';
+  if (result === 'Thoát sớm') return 'Thoát sớm';
+  return result || 'Đóng lệnh';
+}
+
+function formatResultDisplay(row = {}, { includePrice = false, includeR = false, action = false } = {}) {
+  const result = normalizeResult(row) || compactResultLabel(row.result || row.result_text);
+  if (!result || result === '--') return '--';
+  let text = action ? resultActionLabel(result) : result;
+  const price = includePrice ? cleanPrice(closePriceValue(row)) : null;
+  if (price !== null) text += ` @ ${formatMaybePrice(price)}`;
+  const rValue = readTradeR(row);
+  if (includeR && rValue !== null) text += ` (${fmtR(rValue)})`;
+  return text;
+}
+
+function isGenericClosedMessage(message) {
+  const text = safeStatus(message).toUpperCase();
+  return text
+    && !normalizeResult(text)
+    && (text.includes('ĐÃ ĐÓNG') || text.includes('DA DONG') || text.includes('CLOSED') || text.includes('ĐÓNG LỆNH') || text.includes('DONG LENH'));
+}
+
+function logSymbolDirection(log = {}) {
+  const message = safeStatus(log.message || log.event || log.text).toUpperCase();
+  const symbol = safeStatus(log.symbol).toUpperCase() || (message.match(/\b([A-Z0-9]{2,20}USDT)\b/) || [])[1] || '';
+  const direction = safeStatus(log.direction).toUpperCase() || (message.match(/\b(LONG|SHORT)\b/) || [])[1] || '';
+  return { symbol, direction };
+}
+
+function sameTradeLog(a = {}, b = {}) {
+  const left = logSymbolDirection(a);
+  const right = logSymbolDirection(b);
+  if (left.symbol && right.symbol && left.symbol !== right.symbol) return false;
+  if (left.direction && right.direction && left.direction !== right.direction) return false;
+  const leftTime = getItemTimestamp(a);
+  const rightTime = getItemTimestamp(b);
+  if (leftTime !== null && rightTime !== null) return Math.abs(leftTime - rightTime) <= 10 * 60 * 1000;
+  const leftHHmm = formatHHmm(firstValue(a.time_iso, a.created_at_iso, a.updated_at, a.created_at, a.time), a);
+  const rightHHmm = formatHHmm(firstValue(b.time_iso, b.created_at_iso, b.updated_at, b.created_at, b.time), b);
+  return leftHHmm !== '--' && leftHHmm === rightHHmm;
+}
+
+function dedupeGenericClosedLogs(logs = []) {
+  const source = arr(logs);
+  const specific = source.filter(log => normalizeResult(log.message || log.event || log.text));
+  const seen = new Set();
+  return source.filter(log => {
+    if (isGenericClosedMessage(log.message || log.event || log.text) && specific.some(item => sameTradeLog(log, item))) return false;
+    const key = [safeStatus(log.time || log.time_iso), safeStatus(log.type), safeStatus(log.message || log.event || log.text)].join('|');
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 const trackedMetrics = {
@@ -401,12 +563,12 @@ function normalizeDistributionOutcome(value) {
 
 function normalizeResult(row = {}) {
   const value = typeof row === 'object'
-    ? firstValue(row.result, row.outcome, row.pnl_result, row.label)
+    ? firstValue(row.result, row.outcome, row.pnl_result, row.label, row.result_text, row.status, row.state, row.event)
     : row;
   const text = safeStatus(value).toUpperCase();
   if (/\bSL\b/.test(text) || text.includes('STOP LOSS') || text.includes('LOST') || text.includes('LOSS')) return 'SL';
-  if (/\bTP1\b/.test(text)) return 'TP1';
-  if (/\bTP2\b/.test(text)) return 'TP2';
+  if (/\bTP1\b/.test(text) || text.includes('TAKE_PROFIT_1')) return 'TP1';
+  if (/\bTP2\b/.test(text) || text.includes('TAKE_PROFIT_2') || text.includes('WIN') || text.includes('TAKE PROFIT') || text.includes('TAKE_PROFIT')) return 'TP2';
   if (text.includes('EARLY') || text.includes('EXIT') || text.includes('THOÁT SỚM') || text.includes('THOAT SOM') || text.includes('THOÁT')) return 'Thoát sớm';
   return '';
 }
@@ -416,7 +578,12 @@ function readTradeR(row = {}) {
     ? firstValue(row.r, row.rr, row.r_multiple, row.result_r, row.pnl_r)
     : row;
   const number = Number(value);
-  return Number.isFinite(number) ? number : null;
+  if (Number.isFinite(number)) return number;
+  const text = typeof row === 'object'
+    ? safeStatus(firstValue(row.result_text, row.result, row.message))
+    : safeStatus(row);
+  const match = text.match(/([+-]?\d+(?:\.\d+)?)\s*R\b/i);
+  return match ? Number(match[1]) : null;
 }
 
 function isClosedTrade(row = {}) {
@@ -428,9 +595,9 @@ function isClosedTrade(row = {}) {
 }
 
 function resultRowsForStats(tradeJournal, recentResults) {
-  const journalRows = arr(tradeJournal).filter(row => isClosedTrade(row));
+  const journalRows = dedupeClosedTradeRows(tradeJournal);
   if (journalRows.length) return journalRows;
-  return arr(recentResults).filter(row => isClosedTrade(row));
+  return dedupeClosedTradeRows(recentResults);
 }
 
 function sumResultR(rows) {
@@ -515,9 +682,9 @@ function createFilteredDashboardData(source = {}) {
   const filtered = {
     ...source,
     signals: filterHistoricalRows(source.signals),
-    trade_journal: filterHistoricalRows(source.trade_journal, selectedTimeRange, getTradeJournalTimestamp),
-    recent_results: filterHistoricalRows(source.recent_results),
-    activity_logs: filterHistoricalRows(source.activity_logs),
+    trade_journal: dedupeTradeRows(filterHistoricalRows(source.trade_journal, selectedTimeRange, getTradeJournalTimestamp)),
+    recent_results: dedupeClosedTradeRows(filterHistoricalRows(source.recent_results)),
+    activity_logs: dedupeGenericClosedLogs(filterHistoricalRows(source.activity_logs)),
     performance_30d: filterHistoricalRows(source.performance_30d, selectedTimeRange, getDatedItemTimestamp),
     weekly_results: filterHistoricalRows(source.weekly_results, selectedTimeRange, getDatedItemTimestamp)
   };
@@ -886,7 +1053,7 @@ function renderHome() {
     <div class="panel-title">🔥 Tín hiệu mới nhất</div>
     <div class="latest-grid">
       <div class="signal-symbol"><span class="coin-icon ${metricChanged('latest_signal.symbol') ? 'soft-pulse' : ''}">${iconFor(latestSymbol)}</span><span class="big-symbol ${metricChanged('latest_signal.symbol') ? 'value-flash' : ''}">${latestSymbol}</span><span class="badge ${clsDir(latestDirection)}">${latestDirection}</span></div>
-      ${field('Khung', l.timeframe)}${field('Entry', l.entry)}${field('SL', l.sl, 'num-red')}${field('TP1', l.tp1, 'num-green')}${field('TP2', l.tp2, 'num-green')}
+      ${field('Khung', l.timeframe)}${field('Entry', formatMaybePrice(l.entry))}${field('SL', formatMaybePrice(l.sl), 'num-red')}${field('TP1', formatMaybePrice(l.tp1), 'num-green')}${field('TP2', formatMaybePrice(l.tp2), 'num-green')}
       <div class="target-mark">◎</div>
     </div>
     <div class="latest-extra">
@@ -969,7 +1136,7 @@ function readOutcomeCounts() {
 
   if (Object.values(counts).some(Boolean)) return counts;
 
-  arr(dashboardData.recent_results).forEach(item => {
+  dedupeClosedTradeRows(dashboardData.recent_results).forEach(item => {
     const outcome = normalizeOutcomeLabel(item.result || item.label || item.status);
     if (outcome) counts[outcome] += 1;
   });
@@ -1053,26 +1220,32 @@ function renderRecentResults() {
   const recentResults = recentResultsForHome();
   document.getElementById('recentResults').innerHTML = recentResults.length
     ? recentResults.map(r => {
-      const result = normalizeResult(r) || compactResultLabel(r.result);
+      const result = formatResultDisplay(r, { includePrice: true });
+      const outcome = normalizeResult(r) || compactResultLabel(r.result);
       const rValue = readTradeR(r);
-      return `<div class="result-row"><strong><span class="coin-icon" style="width:28px;height:28px;font-size:14px;margin-right:8px">${iconFor(r.symbol)}</span>${safe(r.symbol)}</strong><span class="${clsDir(r.direction)}">${safe(r.direction)}</span><strong class="${result === 'SL' ? 'num-red' : result === 'Thoát sớm' ? 'num-cyan' : 'num-green'}">${safe(result)}</strong><strong class="${safeNumber(rValue) < 0 ? 'num-red' : 'num-green'}">${rValue === null ? '--' : fmtR(rValue)}</strong></div>`;
+      return `<div class="result-row"><strong><span class="coin-icon" style="width:28px;height:28px;font-size:14px;margin-right:8px">${iconFor(r.symbol)}</span>${safe(r.symbol)}</strong><span class="${clsDir(r.direction)}">${safe(r.direction)}</span><strong class="${outcome === 'SL' ? 'num-red' : outcome === 'Thoát sớm' ? 'num-cyan' : 'num-green'}">${safe(result)}</strong><strong class="${safeNumber(rValue) < 0 ? 'num-red' : 'num-green'}">${rValue === null ? '--' : fmtR(rValue)}</strong></div>`;
     }).join('')
     : '<div class="empty-state">Chưa có kết quả gần đây</div>';
 }
 
 function recentResultsForHome() {
-  const existing = arr(dashboardData.recent_results);
-  if (existing.length) return existing;
+  const existing = dedupeClosedTradeRows(dashboardData.recent_results);
+  if (existing.length) return sortNewestRows(existing).slice(0, 5);
 
-  return getFilteredTradeJournal()
-    .filter(isClosedTrade)
+  return dedupeClosedTradeRows(getFilteredTradeJournal())
+    .sort((a, b) => (rowTimestamp(b) ?? -Infinity) - (rowTimestamp(a) ?? -Infinity))
     .slice(0, 5)
     .map(row => ({
       symbol: row.symbol,
       direction: row.direction,
       result: normalizeResult(row) || compactResultLabel(row.result),
       r: readTradeR(row),
-      time: row.time
+      time: row.time,
+      entry: row.entry,
+      timeframe: row.timeframe,
+      opened_at: row.opened_at,
+      exit_price: closePriceValue(row),
+      close_price: closePriceValue(row)
     }));
 }
 
@@ -1088,9 +1261,7 @@ function journalLogMessage(row = {}) {
   const direction = safe(row.direction);
 
   if (isClosedTrade(row)) {
-    const result = normalizeResult(row) || compactResultLabel(row.result);
-    const rText = formatJournalR(readTradeR(row));
-    return `${symbol} ${direction} - ${safe(result)}${rText ? ` (${rText})` : ''}`;
+    return `${symbol} ${direction} - ${formatResultDisplay(row, { includePrice: true, includeR: true, action: true })}`;
   }
 
   if (isPendingHistoryRow(row)) return `${symbol} ${direction} - Chờ xác nhận`;
@@ -1099,10 +1270,10 @@ function journalLogMessage(row = {}) {
 }
 
 function shortLogsForHome() {
-  const existing = arr(dashboardData.activity_logs);
+  const existing = dedupeGenericClosedLogs(dashboardData.activity_logs);
   if (existing.length) return existing.slice(0, 5);
 
-  return getFilteredTradeJournal()
+  return dedupeTradeRows(getFilteredTradeJournal())
     .slice(0, 5)
     .map(row => ({
       time: formatHHmm(row.time, row),
@@ -1118,7 +1289,7 @@ function field(label, value, cls = '') {
 function tradeRow(t, changed = false) {
   const status = safe(t.status);
   const statusClass = safeStatus(status).includes('Chờ') ? 'wait' : 'green';
-  return `<tr class="${changed ? 'row-enter' : ''}"><td><strong><span class="coin-icon" style="width:30px;height:30px;font-size:14px;margin-right:8px">${iconFor(t.symbol)}</span>${safe(t.symbol)}</strong></td><td class="${clsDir(t.direction)}"><strong>${safe(t.direction)}</strong></td><td>${safe(t.entry)}</td><td>${safe(t.tp1)}</td><td>${safe(t.tp2)}</td><td class="num-red">${safe(t.sl)}</td><td><span class="badge ${statusClass}">${status}</span></td></tr>`;
+  return `<tr class="${changed ? 'row-enter' : ''}"><td><strong><span class="coin-icon" style="width:30px;height:30px;font-size:14px;margin-right:8px">${iconFor(t.symbol)}</span>${safe(t.symbol)}</strong></td><td class="${clsDir(t.direction)}"><strong>${safe(t.direction)}</strong></td><td>${formatMaybePrice(t.entry)}</td><td>${formatMaybePrice(t.tp1)}</td><td>${formatMaybePrice(t.tp2)}</td><td class="num-red">${formatMaybePrice(t.sl)}</td><td><span class="badge ${statusClass}">${status}</span></td></tr>`;
 }
 
 function renderSystemMini(id) {
@@ -1181,7 +1352,7 @@ function renderSignalTable() {
     return `<tr class="${idx === selectedSignalIndex ? 'selected' : ''}" data-signal-index="${idx}">
       <td><strong><span class="coin-icon" style="width:30px;height:30px;font-size:14px;margin-right:8px">${iconFor(sig.symbol)}</span>${safe(sig.symbol, 'ETHUSDT')}</strong></td>
       <td class="${clsDir(sig.direction)}"><strong>${safe(sig.direction, 'LONG')}</strong></td>
-      <td>${safe(sig.timeframe)}</td><td>${safe(sig.entry)}</td><td class="num-red">${safe(sig.sl)}</td><td class="num-green">${safe(sig.tp1)}</td><td class="num-green">${safe(sig.tp2)}</td>
+      <td>${safe(sig.timeframe)}</td><td>${formatMaybePrice(sig.entry)}</td><td class="num-red">${formatMaybePrice(sig.sl)}</td><td class="num-green">${formatMaybePrice(sig.tp1)}</td><td class="num-green">${formatMaybePrice(sig.tp2)}</td>
       <td><span class="badge ${statusClass(status)}">${status}</span></td>
       <td class="timeline-time">${formatItemDateTimeVN(sig)}</td>
     </tr>`;
@@ -1207,7 +1378,7 @@ function renderSignalDetail(sig = {}) {
 
   document.getElementById('signalDetail').innerHTML = `<div class="panel-title">◎ Chi tiết tín hiệu</div>
     <div class="signal-symbol" style="margin-bottom:16px"><span class="coin-icon">${iconFor(symbol)}</span><span class="big-symbol">${symbol}</span><span class="badge ${clsDir(direction)}">${direction}</span></div>
-    ${detailRow('R:R', formatRiskReward(sig), 'num-cyan')}${detailRow('Khung thời gian', safe(sig.timeframe))}${detailRow('Entry', safe(sig.entry))}${detailRow('Stop Loss (SL)', safe(sig.sl), 'num-red')}${detailRow('Take Profit 1 (TP1)', safe(sig.tp1), 'num-green')}${detailRow('Take Profit 2 (TP2)', safe(sig.tp2), 'num-green')}${detailRow('Độ tự tin', safe(sig.confidence), 'num-green')}${detailRow('Trạng thái', `<span class="badge ${statusClass(status)}">${status}</span>`)}${detailRow('Thời gian', timeText)}
+    ${detailRow('R:R', formatRiskReward(sig), 'num-cyan')}${detailRow('Khung thời gian', safe(sig.timeframe))}${detailRow('Entry', formatMaybePrice(sig.entry))}${detailRow('Stop Loss (SL)', formatMaybePrice(sig.sl), 'num-red')}${detailRow('Take Profit 1 (TP1)', formatMaybePrice(sig.tp1), 'num-green')}${detailRow('Take Profit 2 (TP2)', formatMaybePrice(sig.tp2), 'num-green')}${detailRow('Độ tự tin', safe(sig.confidence), 'num-green')}${detailRow('Trạng thái', `<span class="badge ${statusClass(status)}">${status}</span>`)}${detailRow('Thời gian', timeText)}
     <div class="note-box"><strong class="num-green">ⓘ Ghi chú</strong><br>${sanitizePublicText(sig.note) === '--' ? 'Không có ghi chú' : sanitizePublicText(sig.note)}</div>`;
 }
 
@@ -1244,6 +1415,8 @@ function ensurePerformanceLayout() {
   if (lineTitle) lineTitle.textContent = `↗ ${getPerformanceTitle()}`;
   const weeklyTitle = document.getElementById('weeklyBars')?.closest('.panel')?.querySelector('.panel-title');
   if (weeklyTitle) weeklyTitle.textContent = `▮ ${getResultPeriodTitle()}`;
+  const distributionTitle = document.getElementById('distribution')?.closest('.panel')?.querySelector('.panel-title');
+  if (distributionTitle) distributionTitle.textContent = '◔ Phân bổ kết quả cuối';
   lineChart?.classList.add('performance-overview-chart');
   lineChart?.closest('.panel')?.classList.add('performance-overview-panel');
   if (lineChart && !document.getElementById('performanceOverviewStats')) {
@@ -1381,6 +1554,12 @@ function normalizeJournalRow(row = {}, fallback = {}) {
     : firstValue(row.created_at_iso, row.opened_at_iso, row.time_iso, row.timestamp, row.updated_at, row.created_at, row.time, row.date, row.display_time, fallback.time);
   return {
     time,
+    signal_id: firstValue(row.signal_id, fallback.signal_id),
+    trade_id: firstValue(row.trade_id, fallback.trade_id),
+    order_id: firstValue(row.order_id, fallback.order_id),
+    entry_order_id: firstValue(row.entry_order_id, fallback.entry_order_id),
+    exchange_order_id: firstValue(row.exchange_order_id, fallback.exchange_order_id),
+    id: firstValue(row.id, fallback.id),
     symbol: firstValue(row.symbol, fallback.symbol),
     direction: safeStatus(firstValue(row.direction, fallback.direction)).toUpperCase(),
     timeframe: firstValue(row.timeframe, row.tf, row.frame, fallback.timeframe),
@@ -1391,7 +1570,13 @@ function normalizeJournalRow(row = {}, fallback = {}) {
     position_value: firstValue(row.position_value, row.positionValue, row.order_value, row.value, fallback.position_value),
     status,
     result,
-    r: firstValue(row.r, row.rr, row.r_multiple, row.result_r, row.pnl_r, fallback.r)
+    r: firstValue(row.r, row.rr, row.r_multiple, row.result_r, row.pnl_r, fallback.r),
+    opened_at: firstValue(row.opened_at, row.opened_at_iso, fallback.opened_at),
+    closed_at: firstValue(row.closed_at, row.closed_at_iso, row.exit_at, row.exited_at, fallback.closed_at),
+    exit_price: firstValue(row.exit_price, row.close_price, row.fill_price, row.avg_close_price, fallback.exit_price),
+    close_price: firstValue(row.close_price, row.exit_price, row.fill_price, row.avg_close_price, fallback.close_price),
+    result_text: firstValue(row.result_text, fallback.result_text),
+    rr_text: firstValue(row.rr_text, row.risk_reward, fallback.rr_text)
   };
 }
 
@@ -1433,7 +1618,7 @@ function fallbackJournalRows() {
 
 function tradeJournalRows() {
   const journal = arr(dashboardData.trade_journal);
-  return journal.map(row => normalizeJournalRow(row));
+  return dedupeTradeRows(journal.map(row => normalizeJournalRow(row)));
 }
 
 function rowTimestamp(row = {}) {
@@ -1449,9 +1634,9 @@ function sortOldestRows(rows) {
 }
 
 function getFilteredTradeJournal() {
-  return sortNewestRows(arr(dashboardData?.trade_journal)
+  return sortNewestRows(dedupeTradeRows(arr(dashboardData?.trade_journal)
     .map(row => normalizeJournalRow(row))
-    .filter(row => isWithinSelectedRange(row)));
+    .filter(row => isWithinSelectedRange(row))));
 }
 
 function formatHHmm(value, item = {}) {
@@ -1589,25 +1774,21 @@ function resultPeriodsForBars() {
 
 function matchesTradeJournalFilter(row) {
   const status = safeStatus(row.status).toLowerCase();
-  const result = safeStatus(row.result).toUpperCase();
+  const result = normalizeResult(row);
   const direction = safeStatus(row.direction).toUpperCase();
 
   if (activeTradeJournalFilter === 'running') return status.includes('đang chạy') || status.includes('active') || status.includes('running');
   if (activeTradeJournalFilter === 'closed') return status.includes('đã đóng') || status.includes('closed');
   if (activeTradeJournalFilter === 'long') return direction === 'LONG';
   if (activeTradeJournalFilter === 'short') return direction === 'SHORT';
-  if (activeTradeJournalFilter === 'sl') return result.includes('SL') || result.includes('STOP LOSS');
-  if (activeTradeJournalFilter === 'tp1') return result.includes('TP1');
-  if (activeTradeJournalFilter === 'tp2') return result.includes('TP2');
+  if (activeTradeJournalFilter === 'sl') return result === 'SL';
+  if (activeTradeJournalFilter === 'tp1') return result === 'TP1';
+  if (activeTradeJournalFilter === 'tp2') return result === 'TP2';
   return true;
 }
 
 function formatTradeNumber(value) {
-  if (value === undefined || value === null || value === '') return '--';
-  const number = Number(value);
-  if (!Number.isFinite(number)) return safe(value);
-  const decimals = Math.abs(number) >= 100 ? 2 : Math.abs(number) >= 1 ? 4 : 6;
-  return number.toFixed(decimals).replace(/\.?0+$/, '');
+  return formatMaybePrice(value);
 }
 
 function formatPositionValue(value) {
@@ -1647,10 +1828,7 @@ function formatJournalResult(row = {}) {
   const status = safeStatus(row.status).toLowerCase();
   if (status.includes('đang chạy') || status.includes('running') || status.includes('active') || status.includes('chờ')) return '--';
 
-  const label = compactResultLabel(row.result);
-  if (label === '--') return '--';
-  const rText = formatJournalR(row.r);
-  return rText ? `${label} (${rText})` : label;
+  return formatResultDisplay(row, { includePrice: true, includeR: true });
 }
 
 function isJournalRunning(row) {
@@ -1664,7 +1842,7 @@ function isJournalClosed(row) {
 }
 
 function journalResultText(row) {
-  return safeStatus(row.result).toUpperCase();
+  return safeStatus(normalizeResult(row) || row.result).toUpperCase();
 }
 
 function statCard(label, value, cls = '') {
@@ -1897,9 +2075,9 @@ function renderSystemTab() {
     ? `<strong class="num-red">${errorText}</strong>`
     : '<strong class="num-green">Không có lỗi gần đây</strong><span>Hệ thống đang hoạt động ổn định</span>';
 
-  const recentLogs = arr(sys.recent_system_logs).length
+  const recentLogs = dedupeGenericClosedLogs(arr(sys.recent_system_logs).length
     ? arr(sys.recent_system_logs)
-    : arr(dashboardData.activity_logs).filter(log => ['SYSTEM', 'Hệ thống', 'Trạng thái'].includes(safeStatus(log.type)));
+    : arr(dashboardData.activity_logs).filter(log => ['SYSTEM', 'Hệ thống', 'Trạng thái'].includes(safeStatus(log.type))));
   document.getElementById('recentSystemLogs').innerHTML = recentLogs.length
     ? recentLogs.slice(0, 8).map(log => `<div class="system-log-row"><span class="timeline-time">${formatSystemDateTime(firstValue(log.time_iso, log.created_at_iso, log.updated_at, log.created_at, log.time))}</span><span>${highlightMessage(log.message || log.event || log.text)}</span></div>`).join('')
     : '<div class="empty-state">Chưa có nhật ký hệ thống.</div>';
@@ -1907,7 +2085,8 @@ function renderSystemTab() {
 
 function renderActivityLogs() {
   const search = (document.getElementById('logSearch')?.value || '').toLowerCase();
-  const logs = arr(dashboardData.activity_logs).filter(l => (activeLogFilter === 'all' || l.type === activeLogFilter) && safeStatus(l.message).toLowerCase().includes(search));
+  const logs = dedupeGenericClosedLogs(dashboardData.activity_logs)
+    .filter(l => (activeLogFilter === 'all' || l.type === activeLogFilter) && safeStatus(l.message).toLowerCase().includes(search));
   document.getElementById('activityLogs').innerHTML = logs.length
     ? logs.map(log => `<div class="timeline-row"><span class="timeline-time">${formatActivityLogTime(log)}</span><span class="log-type ${typeClass(log.type)}">${publicLogType(log.type)}</span><span>${highlightMessage(log.message)}</span></div>`).join('')
     : '<div class="empty-state">Chưa có nhật ký</div>';
