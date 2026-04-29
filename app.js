@@ -1563,6 +1563,10 @@ function ensurePerformanceLayout() {
     weeklyTitle.textContent = `▮ ${getRangeResultTitle()}`;
     weeklyTitle.classList.add('range-result-external-title');
   }
+  const lineLegend = linePanel?.querySelector('.legend');
+  if (lineLegend) {
+    lineLegend.innerHTML = '<span class="dot green"></span> Lợi nhuận cộng dồn (R) <span class="dash"></span> Mốc 0R';
+  }
   const distributionTitle = document.getElementById('distribution')?.closest('.panel')?.querySelector('.panel-title');
   if (distributionTitle) distributionTitle.textContent = '◔ Phân bổ kết quả cuối';
   lineChart?.classList.add('performance-overview-chart');
@@ -1594,6 +1598,51 @@ function insight(icon, label, value, rightLabel, rightValue) {
   return `<div class="insight-row"><div class="kpi-icon" style="width:44px;height:44px;font-size:20px">${icon}</div><div><small>${label}</small><br><strong style="font-size:23px">${safe(value)}</strong></div><div style="text-align:right"><small>${rightLabel}</small><br><strong class="num-green" style="font-size:22px">${safe(rightValue)}</strong></div></div>`;
 }
 
+function getNiceLineStep(value) {
+  const raw = Math.abs(Number(value));
+  if (!Number.isFinite(raw) || raw <= 0) return 0.5;
+  const magnitude = Math.pow(10, Math.floor(Math.log10(raw)));
+  const normalized = raw / magnitude;
+  const steps = [0.5, 1, 2, 5, 10];
+  const step = steps.find(item => normalized <= item) || 10;
+  return step * magnitude;
+}
+
+function buildLineChartAxis(values = []) {
+  const nums = arr(values).map(safeNumber).filter(Number.isFinite);
+  let minValue = Math.min(0, ...nums);
+  let maxValue = Math.max(0, ...nums);
+  if (minValue === maxValue) {
+    minValue -= 0.5;
+    maxValue += 0.5;
+  }
+  const span = Math.max(0.5, maxValue - minValue);
+  const paddedMin = minValue - span * 0.15;
+  const paddedMax = maxValue + span * 0.15;
+  let step = getNiceLineStep((paddedMax - paddedMin) / 4);
+  let min = Math.floor(paddedMin / step) * step;
+  let max = Math.ceil(paddedMax / step) * step;
+
+  if ((max - min) / step > 8) {
+    step = getNiceLineStep((max - min) / 5);
+    min = Math.floor(paddedMin / step) * step;
+    max = Math.ceil(paddedMax / step) * step;
+  }
+
+  const ticks = [];
+  const limit = 16;
+  for (let value = min, index = 0; value <= max + step / 2 && index < limit; value += step, index += 1) {
+    ticks.push(roundR(value));
+  }
+
+  return { min: roundR(min), max: roundR(max), ticks };
+}
+
+function formatLineAxisTick(value) {
+  const number = safeNumber(value);
+  return `${Number.isInteger(number) ? number : number.toFixed(1)}R`;
+}
+
 function renderLineChart(targetId = 'lineChart') {
   const target = document.getElementById(targetId);
   if (!target) return;
@@ -1608,15 +1657,16 @@ function renderLineChart(targetId = 'lineChart') {
   const w = 820, h = 320;
   const padL = 54, padR = 92, padT = 26, padB = 44;
   const ys = data.map(d => safeNumber(d.r));
-  const min = Math.min(-4, ...ys);
-  const max = Math.max(24, ...ys);
+  const axis = buildLineChartAxis(ys);
+  const min = axis.min;
+  const max = axis.max;
   const x = i => padL + (i / Math.max(1, data.length - 1)) * (w - padL - padR);
   const y = v => h - padB - ((v - min) / Math.max(1, max - min)) * (h - padT - padB);
 
   const pts = data.map((d,i)=>`${x(i)},${y(safeNumber(d.r))}`).join(' ');
   const area = `${x(0)},${y(0)} ${pts} ${x(data.length-1)},${y(0)}`;
-  const grid = [-4,0,4,8,12,16,20,24]
-    .map(v => `<line class="chart-grid" x1="${padL}" x2="${w-padR+14}" y1="${y(v)}" y2="${y(v)}"/><text class="axis-label" x="8" y="${y(v)+4}">${v}R</text>`)
+  const grid = axis.ticks
+    .map(v => `<line class="chart-grid" x1="${padL}" x2="${w-padR+14}" y1="${y(v)}" y2="${y(v)}"/><text class="axis-label" x="8" y="${y(v)+4}">${formatLineAxisTick(v)}</text>`)
     .join('');
   const labelIndexes = new Set([0, 3, 6, 9, 12, data.length - 1]);
   const labels = data
@@ -1629,10 +1679,12 @@ function renderLineChart(targetId = 'lineChart') {
   const last = data[data.length - 1];
   const bx = Math.min(w - padR + 10, x(data.length - 1) - 6);
   const by = Math.max(8, y(safeNumber(last.r)) - 28);
-  const isNegative = safeNumber(last.r) < 0;
-  const tagFill = isNegative ? 'rgba(255,77,79,.18)' : 'rgba(103,240,92,.18)';
-  const tagStroke = isNegative ? 'rgba(255,77,79,.8)' : 'rgba(103,240,92,.8)';
-  const tagText = isNegative ? '#ff4d4f' : '#67f05c';
+  const lastR = safeNumber(last.r);
+  const isNegative = lastR < 0;
+  const isPositive = lastR > 0;
+  const tagFill = isNegative ? 'rgba(255,77,79,.18)' : isPositive ? 'rgba(103,240,92,.18)' : 'rgba(180,195,200,.14)';
+  const tagStroke = isNegative ? 'rgba(255,77,79,.8)' : isPositive ? 'rgba(103,240,92,.8)' : 'rgba(180,195,200,.55)';
+  const tagText = isNegative ? '#ff4d4f' : isPositive ? '#67f05c' : '#cbd5d4';
 
   target.innerHTML = `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">${grid}<polygon class="performance-area" points="${area}"/><polyline class="performance-line" points="${pts}"/>${markers}<line class="chart-grid" stroke-dasharray="5 5" x1="${padL}" x2="${w-padR+14}" y1="${y(0)}" y2="${y(0)}"/>${labels}<rect x="${bx}" y="${by}" width="70" height="26" rx="9" fill="${tagFill}" stroke="${tagStroke}"/><text x="${bx+8}" y="${by+18}" fill="${tagText}" font-size="15" font-weight="800">${fmtR(last.r)}</text></svg>`;
 }
@@ -2148,8 +2200,23 @@ function derivePerformanceSeriesFromTradeJournal() {
 }
 
 function performanceSeriesForChart() {
-  const existing = arr(dashboardData.performance_30d);
-  return existing.length ? existing : derivePerformanceSeriesFromTradeJournal();
+  const buckets = buildRangeResultBuckets(rangeResultTrades(), selectedTimeRange);
+  const summaryTotalR = roundR(dashboardData?.summary?.total_r);
+  let cumulative = 0;
+  const series = buckets.map(bucket => {
+    cumulative = roundR(cumulative + safeNumber(bucket.r));
+    return {
+      date: bucket.key,
+      time: bucket.end,
+      label: bucket.label,
+      r: cumulative,
+      period_r: bucket.r,
+      trades: bucket.trades
+    };
+  });
+
+  if (series.length) series[series.length - 1].r = summaryTotalR;
+  return series.length ? series : derivePerformanceSeriesFromTradeJournal();
 }
 
 function matchesTradeJournalFilter(row) {
