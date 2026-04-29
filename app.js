@@ -1944,6 +1944,141 @@ function formatSystemDateTime(value) {
   return formatDateTimeVN(value);
 }
 
+function getLogTimestamp(log = {}) {
+  return (
+    log.time ||
+    log.created_at ||
+    log.created_at_iso ||
+    log.closed_at ||
+    log.opened_at ||
+    log.updated_at ||
+    log.timestamp ||
+    log.time_iso ||
+    null
+  );
+}
+
+function isValidDateTimeParts(year, month, day, hour = 0, minute = 0, second = 0) {
+  if (year < 1000 || month < 1 || month > 12 || day < 1 || hour < 0 || hour > 23 || minute < 0 || minute > 59 || second < 0 || second > 59) {
+    return false;
+  }
+  const probe = new Date(Date.UTC(year, month - 1, day));
+  return probe.getUTCFullYear() === year && probe.getUTCMonth() === month - 1 && probe.getUTCDate() === day;
+}
+
+function formatSystemLogTime(log = {}) {
+  const value = getLogTimestamp(log);
+  if (value === undefined || value === null || value === '') return '--';
+
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value) || value <= 0 || value < 1e9) return '--';
+    const time = value < 1e12 ? value * 1000 : value;
+    return Number.isFinite(time) && time > 0 ? formatDateTimeVN(time) : '--';
+  }
+
+  const raw = safeStatus(value).trim();
+  if (!raw || raw === '-' || raw === '--') return '--';
+
+  const timeOnly = raw.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+  if (timeOnly) {
+    const hour = Number(timeOnly[1]);
+    const minute = Number(timeOnly[2]);
+    if (hour >= 0 && hour <= 23 && minute >= 0 && minute <= 59) {
+      return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+    }
+    return '--';
+  }
+
+  const dmy = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
+  if (dmy) {
+    const day = Number(dmy[1]);
+    const month = Number(dmy[2]);
+    const year = Number(dmy[3]);
+    const hour = Number(dmy[4] || 0);
+    const minute = Number(dmy[5] || 0);
+    const second = Number(dmy[6] || 0);
+    if (!isValidDateTimeParts(year, month, day, hour, minute, second)) return '--';
+    const time = createVietnamDate(year, month, day, hour, minute, second).getTime();
+    if (!Number.isFinite(time)) return '--';
+    const formatted = formatDateTimeVN(time);
+    return dmy[4] ? formatted : formatted.split(' ')[0];
+  }
+
+  const ymd = raw.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T\s](\d{1,2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?(Z|[+-]\d{2}:\d{2})?)?$/);
+  if (ymd) {
+    const hasTime = Boolean(ymd[4]);
+    const hasTimezone = Boolean(ymd[7]);
+    const year = Number(ymd[1]);
+    const month = Number(ymd[2]);
+    const day = Number(ymd[3]);
+    const hour = Number(ymd[4] || 0);
+    const minute = Number(ymd[5] || 0);
+    const second = Number(ymd[6] || 0);
+    if (!isValidDateTimeParts(year, month, day, hour, minute, second)) return '--';
+    const time = raw.includes('T') && hasTimezone
+      ? Date.parse(raw)
+      : createVietnamDate(
+        year,
+        month,
+        day,
+        hour,
+        minute,
+        second
+      ).getTime();
+    if (!Number.isFinite(time) || Number.isNaN(time)) return '--';
+    const formatted = formatDateTimeVN(time);
+    return hasTime ? formatted : formatted.split(' ')[0];
+  }
+
+  return '--';
+}
+
+function systemLogMatchKey(log = {}) {
+  const message = safeStatus(log.message || log.event || log.text).trim();
+  const type = safeStatus(log.type).trim();
+  return message ? `${type}::${message}` : '';
+}
+
+function buildActivityLogTimestampBuckets(logs = []) {
+  const buckets = new Map();
+  arr(logs).forEach(log => {
+    if (formatSystemLogTime(log) === '--') return;
+    const key = systemLogMatchKey(log);
+    if (!key) return;
+    if (!buckets.has(key)) buckets.set(key, []);
+    buckets.get(key).push(log);
+  });
+  return buckets;
+}
+
+function enrichSystemLogTimestamp(log = {}, activityBuckets = new Map()) {
+  if (formatSystemLogTime(log) !== '--') return log;
+  const key = systemLogMatchKey(log);
+  const bucket = key ? activityBuckets.get(key) : null;
+  const source = bucket?.shift();
+  if (!source) return log;
+  return {
+    ...log,
+    time: getLogTimestamp(source),
+    created_at: source.created_at,
+    created_at_iso: source.created_at_iso,
+    closed_at: source.closed_at,
+    opened_at: source.opened_at,
+    updated_at: source.updated_at,
+    timestamp: source.timestamp,
+    time_iso: source.time_iso
+  };
+}
+
+function systemRecentLogRows(sys = {}) {
+  const systemLogs = arr(sys.recent_system_logs);
+  const activityLogs = arr(dashboardData.activity_logs);
+  if (!systemLogs.length) return activityLogs;
+
+  const activityBuckets = buildActivityLogTimestampBuckets(activityLogs);
+  return systemLogs.map(log => enrichSystemLogTimestamp(log, activityBuckets));
+}
+
 function formatActivityLogTime(log = {}) {
   const formatted = formatItemDateTimeVN(log);
   if (formatted !== '--') return formatted;
@@ -2075,11 +2210,9 @@ function renderSystemTab() {
     ? `<strong class="num-red">${errorText}</strong>`
     : '<strong class="num-green">Không có lỗi gần đây</strong><span>Hệ thống đang hoạt động ổn định</span>';
 
-  const recentLogs = dedupeGenericClosedLogs(arr(sys.recent_system_logs).length
-    ? arr(sys.recent_system_logs)
-    : arr(dashboardData.activity_logs).filter(log => ['SYSTEM', 'Hệ thống', 'Trạng thái'].includes(safeStatus(log.type))));
+  const recentLogs = dedupeGenericClosedLogs(systemRecentLogRows(sys));
   document.getElementById('recentSystemLogs').innerHTML = recentLogs.length
-    ? recentLogs.slice(0, 8).map(log => `<div class="system-log-row"><span class="timeline-time">${formatSystemDateTime(firstValue(log.time_iso, log.created_at_iso, log.updated_at, log.created_at, log.time))}</span><span>${highlightMessage(log.message || log.event || log.text)}</span></div>`).join('')
+    ? recentLogs.slice(0, 8).map(log => `<div class="system-log-row"><span class="timeline-time">${formatSystemLogTime(log)}</span><span>${highlightMessage(log.message || log.event || log.text)}</span></div>`).join('')
     : '<div class="empty-state">Chưa có nhật ký hệ thống.</div>';
 }
 
