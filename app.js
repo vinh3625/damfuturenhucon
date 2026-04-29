@@ -1537,7 +1537,7 @@ function renderPerformance() {
   ].join('');
   renderLineChart();
   renderPerformanceOverviewStats();
-  renderWeeklyBars();
+  renderRangeResultAxisCard(buildRangeResultBuckets(rangeResultTrades(), selectedTimeRange), selectedTimeRange);
   renderPerformanceDistribution();
   const pairPerformance = arr(dashboardData.pair_performance);
   document.getElementById('pairPerfBody').innerHTML = pairPerformance.length
@@ -1894,10 +1894,19 @@ function renderRangeResultAxisChart(buckets, range = selectedTimeRange) {
   </div>`;
 }
 
-function renderRangeResultBars(buckets, range = selectedTimeRange) {
+function ensureAxisRangeRenderProbe() {
+  if (document.getElementById('axisRangeRenderProbe')) return;
+  document.body.insertAdjacentHTML(
+    'beforeend',
+    '<div id="axisRangeRenderProbe" class="axis-range-render-probe">Độ lớn R Thời gian</div>'
+  );
+}
+
+function renderRangeResultAxisCard(buckets, range = selectedTimeRange) {
   const target = document.getElementById('weeklyBars');
   if (!target) return;
-  target.classList.add('range-result-bars');
+  ensureAxisRangeRenderProbe();
+  target.classList.add('range-result-bars', 'range-result-axis-rendered');
 
   const totalR = roundR(buckets.reduce((sum, bucket) => sum + safeNumber(bucket.r), 0));
   const totalTrades = buckets.reduce((sum, bucket) => sum + safeNumber(bucket.trades), 0);
@@ -1908,11 +1917,13 @@ function renderRangeResultBars(buckets, range = selectedTimeRange) {
   const rangeClass = ` range-${safeStatus(range).toLowerCase() || 'all'}`;
 
   target.innerHTML = `
-    <div class="range-result-chart${compact}${single}${rangeClass}">
+    <div class="range-result-chart${compact}${single}${rangeClass}" data-renderer="axis-range-bars-v2">
+      <div class="debug-axis-chart-version" style="display:none">AXIS_RANGE_BARS_V2_0459e51</div>
       <div class="range-result-header">
         <div class="range-result-title">${escapeHtml(getRangeResultTitle(range))}</div>
         <div class="range-result-subtitle">Biểu đồ cột theo mốc thời gian</div>
       </div>
+      <div class="range-axis-dom-labels" aria-hidden="true"><span>Độ lớn R</span><span>Thời gian</span></div>
       <div class="range-result-plot">${renderRangeResultAxisChart(buckets, range)}</div>
       <div class="range-bars-summary">
         <div><span>Tổng R</span><strong class="${totalR < 0 ? 'num-red' : totalR > 0 ? 'num-green' : ''}">${fmtR(totalR)}</strong></div>
@@ -1921,11 +1932,6 @@ function renderRangeResultBars(buckets, range = selectedTimeRange) {
         <div><span>Xấu nhất</span><strong class="${safeNumber(worst.r) < 0 ? 'num-red' : ''}">${escapeHtml(worst.label || '--')} · ${fmtR(worst.r)}</strong></div>
       </div>
     </div>`;
-}
-
-function renderWeeklyBars() {
-  const buckets = buildRangeResultBuckets(rangeResultTrades(), selectedTimeRange);
-  renderRangeResultBars(buckets, selectedTimeRange);
 }
 
 function renderDistribution(targetId = 'distribution') {
