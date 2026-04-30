@@ -208,7 +208,7 @@ h1 { margin: 0; font-size: 31px; letter-spacing: .8px; }
   border-radius: 8px;
   background: rgba(255, 255, 255, .035);
 }
-.active-banner-metric span {
+.active-banner-metric > span {
   display: block;
   color: var(--muted);
   font-size: 11px;
@@ -344,7 +344,7 @@ label { color: #b5c1c4; display: flex; align-items: center; gap: 8px; }
 .bar-negative { background: linear-gradient(180deg, #ff7779, #d82f36); box-shadow: 0 0 10px rgba(255,77,79,.14); }
 .bar-value { color:#e7f6ea; font-weight:800; margin-bottom:7px; }
 .bar-label { width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; color:#cbd5d4; font-size:13px; line-height: 1.18; text-align: center; white-space: normal; }
-.bar-label span { display: block; width: 100%; text-align: center; }
+.bar-label > span { display: block; width: 100%; text-align: center; }
 .bar-separator { color: var(--muted); font-weight: 800; line-height: 1; }
 .bar-chart.range-result-bars {
   display: block;
@@ -484,7 +484,7 @@ label { color: #b5c1c4; display: flex; align-items: center; gap: 8px; }
   border-radius: 9px;
   background: rgba(255, 255, 255, .035);
 }
-.range-bars-summary span {
+.range-bars-summary > div > span {
   display: block;
   color: var(--muted);
   font-size: 11px;
@@ -692,7 +692,8 @@ label { color: #b5c1c4; display: flex; align-items: center; gap: 8px; }
 .journal-stat-card strong {
   position: relative;
   z-index: 2;
-  display: block;
+  display: flex;
+  align-items: baseline;
   margin-top: 8px;
   font-size: 24px;
   line-height: 1;
@@ -700,18 +701,20 @@ label { color: #b5c1c4; display: flex; align-items: center; gap: 8px; }
   white-space: nowrap;
 }
 .journal-stat-card .r-display {
-  display: inline-flex;
+  display: inline-flex !important;
   align-items: baseline;
+  flex-direction: row;
   flex-wrap: nowrap;
   gap: 2px;
   white-space: nowrap;
   line-height: 1;
 }
 .journal-stat-card .r-unit {
-  display: inline;
+  display: inline-block !important;
   font-size: .68em;
   font-weight: 600;
   opacity: .68;
+  white-space: nowrap;
 }
 .journal-stat-green {
   background:
@@ -1874,7 +1877,7 @@ body.data-refreshing .live-badge {
   min-width: 0;
 }
 
-.home-mini-stat span {
+.home-mini-stat > span {
   display: block;
   color: var(--muted);
   font-size: 12px;
@@ -2145,23 +2148,32 @@ body.data-refreshing .live-badge {
 
 /* ===== R-unit display ===== */
 .r-display {
-  display: inline-flex;
+  display: inline-flex !important;
   align-items: baseline;
+  flex-direction: row;
+  flex-wrap: nowrap;
   gap: 2px;
   white-space: nowrap;
   line-height: 1;
+  vertical-align: baseline;
 }
 
 .r-display .r-value {
+  display: inline-block !important;
   font-weight: 900;
+  line-height: 1;
+  white-space: nowrap;
 }
 
 .r-display .r-unit {
+  display: inline-block !important;
   font-size: 0.68em;
   font-weight: 600;
   opacity: 0.72;
   letter-spacing: 0.02em;
   margin-left: 1px;
+  line-height: 1;
+  white-space: nowrap;
 }
 
 .r-display.positive {
@@ -2204,7 +2216,10 @@ body.data-refreshing .live-badge {
 
 /* R-display in tight contexts */
 .active-banner-metric .r-display {
-  display: inline;
+  display: inline-flex !important;
+  align-items: baseline;
+  flex-wrap: nowrap;
+  white-space: nowrap;
 }
 
 .active-banner-metric .r-display .r-unit {
@@ -2223,6 +2238,14 @@ body.data-refreshing .live-badge {
 
 .range-bars-summary .r-display {
   font-size: inherit;
+  width: auto;
+  max-width: max-content;
+}
+
+.range-bars-summary .r-display .r-unit,
+.range-bars-summary .r-display .r-value {
+  display: inline-block !important;
+  white-space: nowrap;
 }
 
 td .r-display {
@@ -2241,4 +2264,21 @@ td .r-display {
 .home-metric-strip .r-display {
   font-size: inherit;
   font-weight: inherit;
+}
+
+/* Override for card/summary containers to prevent R unit line-break */
+.metric-card .r-display,
+.kpi-card .r-display,
+.stat-card .r-display,
+.performance-card .r-display,
+.performance-stat-card .r-display,
+.range-summary-card .r-display,
+.daily-profit-card .r-display {
+  display: inline-flex !important;
+  align-items: baseline;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+  width: auto;
+  max-width: max-content;
 }
