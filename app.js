@@ -1498,7 +1498,7 @@ function ensureSystemTab() {
           <div class="panel-title">⟳ Nhịp quét tín hiệu</div>
           <div class="table-wrap">
             <table class="system-scan-table">
-              <thead><tr><th>Khung</th><th>Vai trò</th><th>Lần quét cuối</th><th>Lần tới</th><th>Trạng thái</th></tr></thead>
+              <thead><tr><th>KHUNG</th><th>VAI TRÒ</th><th>LẦN QUÉT CUỐI</th><th>LẦN TỚI</th><th>TRẠNG THÁI</th></tr></thead>
               <tbody id="systemScanBody"></tbody>
             </table>
           </div>
@@ -1563,7 +1563,7 @@ function ensureTradeJournalLayout() {
       </div>
       <div class="table-wrap trade-journal-wrap">
         <table class="trade-journal-table">
-          <thead><tr><th>Cặp / Thời gian</th><th>Hướng</th><th>Khung</th><th>Entry</th><th>SL</th><th>TP1</th><th>TP2</th><th>Giá trị lệnh</th><th>Trạng thái</th><th>Kết quả</th></tr></thead>
+          <thead><tr><th>CẶP / THỜI GIAN</th><th>HƯỚNG</th><th>KHUNG</th><th>ENTRY</th><th>SL</th><th>TP1</th><th>TP2</th><th>GIÁ TRỊ LỆNH</th><th>TRẠNG THÁI</th><th>KẾT QUẢ</th></tr></thead>
           <tbody id="tradeJournalBody"></tbody>
         </table>
       </div>
@@ -1763,7 +1763,7 @@ function renderRecentResults() {
   const recentResults = recentResultsForHome();
   document.getElementById('recentResults').innerHTML = recentResults.length
     ? `<div class="recent-results-table">
-        <div class="recent-results-head"><span>Cặp / Thời gian</span><span>Thời lượng</span><span>Hướng</span><span>Trạng thái</span><span>R</span></div>
+        <div class="recent-results-head"><span>CẶP / THỜI GIAN</span><span>THỜI LƯỢNG</span><span>HƯỚNG</span><span>TRẠNG THÁI</span><span>R</span></div>
         ${recentResults.map(r => {
       const status = getTradeOutcomeStatus(r);
       const rValue = getTradeResultR(r);
@@ -1902,7 +1902,7 @@ function getFilteredSignals() {
 }
 
 function renderSignalTable() {
-  document.querySelector('.signal-table thead').innerHTML = '<tr><th>Cặp / Thời gian</th><th>Hướng</th><th>Khung</th><th>Entry</th><th>SL</th><th>TP1</th><th>TP2</th><th>Trạng thái</th><th>Kết quả</th></tr>';
+  document.querySelector('.signal-table thead').innerHTML = '<tr><th>CẶP / THỜI GIAN</th><th>HƯỚNG</th><th>KHUNG</th><th>ENTRY</th><th>SL</th><th>TP1</th><th>TP2</th><th>TRẠNG THÁI</th><th>KẾT QUẢ</th></tr>';
   const hasPublicSignals = arr(dashboardData.signals).length > 0;
   const rows = hasPublicSignals ? getFilteredSignals() : [];
   if (selectedSignalIndex >= rows.length) selectedSignalIndex = 0;

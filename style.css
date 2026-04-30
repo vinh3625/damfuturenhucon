@@ -555,20 +555,22 @@ label { color: #b5c1c4; display: flex; align-items: center; gap: 8px; }
 .range-bars-summary {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
+  gap: 18px;
 }
 .range-bars-summary > div {
   min-width: 0;
-  padding: 9px 10px;
+  min-height: 92px;
+  padding: 18px 20px;
   border: 1px solid rgba(255, 255, 255, .09);
-  border-radius: 9px;
+  border-radius: 16px;
   background: rgba(255, 255, 255, .035);
 }
 .range-bars-summary > div > span {
   display: block;
   color: var(--muted);
-  font-size: 11px;
-  font-weight: 850;
+  font-size: 15px;
+  font-weight: 750;
+  margin-bottom: 8px;
 }
 .range-bars-summary strong {
   display: block;
@@ -576,7 +578,9 @@ label { color: #b5c1c4; display: flex; align-items: center; gap: 8px; }
   overflow: visible;
   text-overflow: clip;
   white-space: normal;
-  font-size: 13px;
+  font-size: 22px;
+  font-weight: 850;
+  line-height: 1.2;
 }
 .distribution { display:grid; grid-template-columns: 160px 1fr; gap: 20px; align-items:center; }
 .donut { width: 150px; height: 150px; border-radius: 50%; background: conic-gradient(var(--trade-tp1) 0 37%, var(--trade-tp2) 37% 68%, var(--trade-sl) 68% 89%, var(--yellow) 89% 100%); display:grid; place-items:center; position:relative; }
