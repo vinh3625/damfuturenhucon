@@ -967,7 +967,64 @@ function targetRFromTrade(trade, targetKey) {
   return Math.abs(target - entry) / risk;
 }
 
+function isOpenLikeTrade(trade) {
+  const text = [
+    trade.status,
+    trade.result,
+    trade.state,
+    trade.close_reason,
+    trade.exit_reason,
+    trade.actual_result
+  ].map(safeStatus).join(' ').toUpperCase();
+
+  return (
+    text.includes('ĐANG CHẠY') ||
+    text.includes('DANG CHAY') ||
+    text.includes('ACTIVE') ||
+    text.includes('OPEN') ||
+    text.includes('MONITORING') ||
+    text.includes('RUNNING') ||
+    text.includes('CHỜ XÁC NHẬN') ||
+    text.includes('CHO XAC NHAN') ||
+    text.includes('PENDING') ||
+    text.includes('CONFIRMED_SIGNAL')
+  );
+}
+
+function hasClosedOutcome(trade) {
+  const text = [
+    trade.result,
+    trade.status,
+    trade.result_text,
+    trade.close_reason,
+    trade.exit_reason,
+    trade.actual_result
+  ].map(safeStatus).join(' ').toUpperCase();
+
+  return (
+    text.includes('SL') ||
+    text.includes('STOP_LOSS') ||
+    text.includes('TP1') ||
+    text.includes('TP2') ||
+    text.includes('TAKE_PROFIT') ||
+    text.includes('THOÁT SỚM') ||
+    text.includes('THOAT SOM') ||
+    text.includes('EARLY') ||
+    text.includes('HÒA VỐN') ||
+    text.includes('HOA VON') ||
+    text.includes('BREAK_EVEN') ||
+    text.includes('BREAKEVEN') ||
+    text.includes('ĐÃ ĐÓNG') ||
+    text.includes('DA DONG') ||
+    text.includes('CLOSED')
+  );
+}
+
 function inferTradeR(trade) {
+  if (isOpenLikeTrade(trade) && !hasClosedOutcome(trade)) {
+    return null;
+  }
+
   const outcome = normalizeResult(trade);
   const direct = firstValue(trade.r, trade.rr, trade.r_multiple, trade.result_r, trade.pnl_r);
   const directNumber = Number(direct);
