@@ -114,6 +114,35 @@ const OPEN_TRADE_TIME_FIELDS = [
   'date'
 ];
 
+const RECENT_RESULT_OPEN_TIME_FIELDS = [
+  'opened_at',
+  'opened_at_iso',
+  'open_time',
+  'started_at',
+  'entry_time',
+  'entry_at',
+  'created_at_iso',
+  'created_at',
+  'timestamp'
+];
+
+const EXPLICIT_RECENT_RESULT_CLOSE_TIME_FIELDS = [
+  'closed_at',
+  'closed_at_iso',
+  'close_time',
+  'closed_time',
+  'finished_at',
+  'exit_time',
+  'exited_at'
+];
+
+const RECENT_RESULT_CLOSE_TIME_FIELDS = [
+  ...EXPLICIT_RECENT_RESULT_CLOSE_TIME_FIELDS,
+  'time',
+  'time_iso',
+  'updated_at'
+];
+
 function timestampFromFields(item = {}, fields = DEFAULT_PAIR_TIME_FIELDS) {
   for (const field of fields) {
     const time = parseDashboardTime(item[field], item);
@@ -190,6 +219,31 @@ function renderRunningDuration(trade = {}) {
   const duration = formatRunningDuration(getTradeOpenTime(trade));
   const missing = duration === '--' ? ' missing' : '';
   return `<span class="running-duration${missing}">${duration}</span>`;
+}
+
+function getRecentTradeOpenTime(trade = {}) {
+  const directTime = timestampFromFields(trade, RECENT_RESULT_OPEN_TIME_FIELDS);
+  if (directTime !== null) return directTime;
+
+  const genericTime = timestampFromFields(trade, ['time', 'time_iso']);
+  const explicitCloseTime = timestampFromFields(trade, EXPLICIT_RECENT_RESULT_CLOSE_TIME_FIELDS);
+  if (genericTime !== null && explicitCloseTime !== null && genericTime !== explicitCloseTime) return genericTime;
+
+  return null;
+}
+
+function getRecentTradeCloseTime(trade = {}) {
+  return timestampFromFields(trade, RECENT_RESULT_CLOSE_TIME_FIELDS);
+}
+
+function formatTradeDuration(openTime, closeTime) {
+  return formatRunningDuration(openTime, closeTime);
+}
+
+function renderTradeDuration(trade = {}) {
+  const duration = formatTradeDuration(getRecentTradeOpenTime(trade), getRecentTradeCloseTime(trade));
+  const missing = duration === '--' ? ' missing' : '';
+  return `<span class="duration-cell${missing}">${duration}</span>`;
 }
 
 const signalList = () => {
@@ -1546,7 +1600,7 @@ function renderRecentResults() {
   const recentResults = recentResultsForHome();
   document.getElementById('recentResults').innerHTML = recentResults.length
     ? `<div class="recent-results-table">
-        <div class="recent-results-head"><span>Cặp / Thời gian</span><span>Hướng</span><span>Trạng thái</span><span>R</span></div>
+        <div class="recent-results-head"><span>Cặp / Thời gian</span><span>Hướng</span><span>Trạng thái</span><span>Thời lượng</span><span>R</span></div>
         ${recentResults.map(r => {
       const status = getTradeOutcomeStatus(r);
       const rValue = getTradeResultR(r);
@@ -1554,7 +1608,8 @@ function renderRecentResults() {
         ${renderPairTimeCell(r, { iconStyle: 'width:28px;height:28px;font-size:14px;margin-right:8px' })}
         <span><span class="badge ${clsDir(r.direction)}">${safe(r.direction)}</span></span>
         <strong><span class="badge ${statusClass(status)}">${status}</span></strong>
-        <strong class="${safeNumber(rValue) < 0 ? 'num-red' : 'num-green'}">${rValue === null ? '--' : renderRValue(rValue)}</strong>
+        ${renderTradeDuration(r)}
+        <strong class="result-r-cell ${safeNumber(rValue) < 0 ? 'num-red' : 'num-green'}">${rValue === null ? '--' : renderRValue(rValue)}</strong>
       </div>`;
     }).join('')}
       </div>`
@@ -1574,9 +1629,23 @@ function recentResultsForHome() {
       result: normalizeResult(row) || compactResultLabel(row.result),
       r: readTradeR(row),
       time: row.time,
+      time_iso: row.time_iso,
       entry: row.entry,
       timeframe: row.timeframe,
       opened_at: row.opened_at,
+      opened_at_iso: row.opened_at_iso,
+      created_at_iso: row.created_at_iso,
+      created_at: row.created_at,
+      entry_time: row.entry_time,
+      timestamp: row.timestamp,
+      closed_at: row.closed_at,
+      closed_at_iso: row.closed_at_iso,
+      close_time: row.close_time,
+      closed_time: row.closed_time,
+      finished_at: row.finished_at,
+      exit_time: row.exit_time,
+      exited_at: row.exited_at,
+      updated_at: row.updated_at,
       exit_price: closePriceValue(row),
       close_price: closePriceValue(row)
     }));

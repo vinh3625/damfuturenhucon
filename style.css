@@ -246,7 +246,7 @@ tr.selected { outline: 1px solid rgba(103,240,92,.74); outline-offset: -1px; bac
 .recent-results-head,
 .recent-result-row {
   display: grid;
-  grid-template-columns: minmax(190px, 1.25fr) 92px minmax(160px, 1fr) 72px;
+  grid-template-columns: minmax(210px, 1.45fr) 86px minmax(112px, .7fr) minmax(92px, .6fr) 74px;
   gap: 10px;
   align-items: center;
   min-width: 0;
@@ -266,6 +266,20 @@ tr.selected { outline: 1px solid rgba(103,240,92,.74); outline-offset: -1px; bac
 .recent-result-row > * {
   min-width: 0;
   overflow-wrap: anywhere;
+}
+.recent-results-table .duration-cell {
+  color: rgba(232, 246, 242, .86);
+  font-weight: 850;
+  white-space: nowrap;
+}
+.recent-results-table .duration-cell.missing {
+  color: rgba(180, 190, 200, .55);
+}
+.recent-results-head span:last-child,
+.recent-results-table .result-r-cell {
+  justify-self: end;
+  text-align: right;
+  white-space: nowrap;
 }
 .timeline { display: grid; gap: 0; }
 .timeline-row { display: grid; grid-template-columns: minmax(128px, auto) 24px 1fr; gap: 10px; align-items: center; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,.08); }
