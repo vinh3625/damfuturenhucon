@@ -246,7 +246,7 @@ tr.selected { outline: 1px solid rgba(103,240,92,.74); outline-offset: -1px; bac
 .recent-results-head,
 .recent-result-row {
   display: grid;
-  grid-template-columns: minmax(190px, 1.25fr) 92px minmax(160px, 1fr) 72px;
+  grid-template-columns: minmax(128px, .85fr) minmax(150px, 1fr) 92px minmax(160px, 1.15fr) 72px;
   gap: 10px;
   align-items: center;
   min-width: 0;
@@ -295,34 +295,20 @@ label { color: #b5c1c4; display: flex; align-items: center; gap: 8px; }
 .signal-table td, .signal-table th { padding: 11px 10px; font-size: 13px; }
 .table-panel { min-width: 0; }
 .pagination { display:flex; justify-content: space-between; align-items:center; color: var(--muted); padding-top: 13px; }
-.pair-time-cell {
-  display: flex;
-  align-items: center;
-  gap: 12px;
+.signal-symbol-time {
+  display: grid;
+  gap: 6px;
   min-width: 0;
 }
-.pair-icon {
-  margin-right: 0 !important;
-}
-.pair-stack {
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-  min-width: 0;
-}
-.pair-line,
-.pair-line strong {
+.signal-symbol-time strong {
   display: inline-flex;
   align-items: center;
   min-width: 0;
-  white-space: nowrap;
 }
-.pair-time {
-  color: rgba(205, 218, 220, .88);
-  font-size: .95rem;
-  font-weight: 850;
-  line-height: 1.15;
-  letter-spacing: .01em;
+.signal-row-time {
+  color: var(--cyan);
+  font-size: 12px;
+  font-weight: 800;
   white-space: nowrap;
 }
 .signal-result-r {
@@ -831,7 +817,7 @@ label { color: #b5c1c4; display: flex; align-items: center; gap: 8px; }
   transition: transform 180ms ease, background 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
 }
 .trade-journal-wrap { max-width: 100%; overflow-x: auto; }
-.trade-journal-table { min-width: 1100px; }
+.trade-journal-table { min-width: 1180px; }
 .trade-journal-table th,
 .trade-journal-table td {
   white-space: nowrap;
