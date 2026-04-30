@@ -639,34 +639,127 @@ label { color: #b5c1c4; display: flex; align-items: center; gap: 8px; }
 .journal-stats-grid {
   display: grid;
   grid-template-columns: repeat(8, minmax(0, 1fr));
-  gap: 10px;
+  gap: 12px;
   margin-bottom: 16px;
   min-width: 0;
 }
 .journal-stat-card {
+  position: relative;
+  overflow: hidden;
   min-width: 0;
-  padding: 10px 11px;
-  border: 1px solid rgba(255, 255, 255, .09);
-  border-radius: 10px;
-  background: rgba(255, 255, 255, .035);
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, .10);
+  background: rgba(255, 255, 255, .045);
+  box-shadow:
+    0 14px 30px rgba(0, 0, 0, .34),
+    inset 0 1px 0 rgba(255, 255, 255, .05);
+  transform-origin: center;
+  transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease, background .18s ease, filter .18s ease;
+}
+.journal-stat-card::before {
+  content: "";
+  position: absolute;
+  inset: -45%;
+  opacity: .22;
+  pointer-events: none;
+  filter: blur(18px);
+  transform: rotate(12deg);
 }
 .journal-stat-card span {
+  position: relative;
+  z-index: 1;
   display: block;
-  color: #aebbbe;
+  color: rgba(232, 246, 242, .72);
   font-size: 12px;
-  font-weight: 750;
+  font-weight: 800;
+  letter-spacing: .01em;
   line-height: 1.15;
   white-space: nowrap;
 }
 .journal-stat-card strong {
+  position: relative;
+  z-index: 1;
   display: block;
-  margin-top: 5px;
-  font-size: 20px;
+  margin-top: 7px;
+  font-size: 24px;
   line-height: 1;
-  font-weight: 900;
+  font-weight: 950;
   white-space: nowrap;
 }
-.journal-stat-card,
+.journal-stat-green {
+  background:
+    radial-gradient(circle at 20% 0%, rgba(88, 255, 96, .22), transparent 42%),
+    linear-gradient(180deg, rgba(21, 80, 36, .72), rgba(8, 24, 17, .86));
+  border-color: rgba(88, 255, 96, .30);
+  box-shadow:
+    0 14px 34px rgba(0, 0, 0, .36),
+    0 0 22px rgba(88, 255, 96, .10),
+    inset 0 1px 0 rgba(255, 255, 255, .06);
+}
+.journal-stat-green::before { background: rgba(88, 255, 96, .28); }
+.journal-stat-red {
+  background:
+    radial-gradient(circle at 20% 0%, rgba(255, 80, 92, .24), transparent 42%),
+    linear-gradient(180deg, rgba(92, 26, 36, .72), rgba(30, 9, 14, .88));
+  border-color: rgba(255, 95, 110, .34);
+  box-shadow:
+    0 14px 34px rgba(0, 0, 0, .36),
+    0 0 22px rgba(255, 80, 92, .11),
+    inset 0 1px 0 rgba(255, 255, 255, .06);
+}
+.journal-stat-red::before { background: rgba(255, 80, 92, .30); }
+.journal-stat-cyan {
+  background:
+    radial-gradient(circle at 20% 0%, rgba(57, 205, 255, .23), transparent 42%),
+    linear-gradient(180deg, rgba(18, 66, 82, .70), rgba(7, 24, 31, .88));
+  border-color: rgba(57, 205, 255, .32);
+  box-shadow:
+    0 14px 34px rgba(0, 0, 0, .36),
+    0 0 22px rgba(57, 205, 255, .10),
+    inset 0 1px 0 rgba(255, 255, 255, .06);
+}
+.journal-stat-cyan::before { background: rgba(57, 205, 255, .28); }
+.journal-stat-neutral {
+  background:
+    radial-gradient(circle at 20% 0%, rgba(180, 190, 200, .18), transparent 42%),
+    linear-gradient(180deg, rgba(40, 48, 52, .64), rgba(12, 16, 18, .88));
+  border-color: rgba(180, 190, 200, .20);
+  box-shadow:
+    0 14px 34px rgba(0, 0, 0, .36),
+    0 0 18px rgba(180, 190, 200, .07),
+    inset 0 1px 0 rgba(255, 255, 255, .05);
+}
+.journal-stat-neutral::before { background: rgba(180, 190, 200, .18); }
+.journal-stat-card:hover {
+  z-index: 12;
+  transform: translateY(-3px);
+  filter: brightness(1.08);
+}
+.journal-stat-green:hover {
+  border-color: rgba(88, 255, 96, .58);
+  box-shadow:
+    0 18px 42px rgba(0, 0, 0, .42),
+    0 0 34px rgba(88, 255, 96, .20);
+}
+.journal-stat-red:hover {
+  border-color: rgba(255, 95, 110, .62);
+  box-shadow:
+    0 18px 42px rgba(0, 0, 0, .42),
+    0 0 34px rgba(255, 80, 92, .22);
+}
+.journal-stat-cyan:hover {
+  border-color: rgba(57, 205, 255, .58);
+  box-shadow:
+    0 18px 42px rgba(0, 0, 0, .42),
+    0 0 34px rgba(57, 205, 255, .20);
+}
+.journal-stat-neutral:hover {
+  border-color: rgba(180, 190, 200, .42);
+  box-shadow:
+    0 18px 42px rgba(0, 0, 0, .42),
+    0 0 28px rgba(180, 190, 200, .15);
+}
 .system-status-card {
   position: relative;
   z-index: 1;
@@ -1064,8 +1157,7 @@ body::after {
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .system-status-card:hover,
-  .journal-stat-card:hover {
+  .system-status-card:hover {
     z-index: 12;
     transform: translateY(-4px);
     background: linear-gradient(145deg, #07100E, #0B1714);

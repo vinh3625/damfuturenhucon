@@ -2351,23 +2351,25 @@ function journalResultText(row) {
   return safeStatus(normalizeResult(row) || row.result).toUpperCase();
 }
 
-function statCard(label, value, cls = '') {
-  return `<div class="journal-stat-card"><span>${label}</span><strong class="${cls}">${safe(value)}</strong></div>`;
+function statCard(label, value, cls = '', tone = 'neutral') {
+  const resolvedTone = ['neutral', 'cyan', 'green', 'red'].includes(tone) ? tone : 'neutral';
+  return `<div class="journal-stat-card journal-stat-${resolvedTone}"><span>${label}</span><strong class="${cls}">${safe(value)}</strong></div>`;
 }
 
 function renderJournalQuickStats(rows) {
   const target = document.getElementById('journalQuickStats');
   if (!target) return;
   const totalR = rows.reduce((sum, row) => sum + safeNumber(row.r), 0);
+  const totalTone = totalR < 0 ? 'red' : totalR > 0 ? 'green' : 'neutral';
   target.innerHTML = [
-    statCard('Tổng lệnh', rows.length),
-    statCard('Đang chạy', rows.filter(isJournalRunning).length, 'num-cyan'),
-    statCard('Đã đóng', rows.filter(isJournalClosed).length, 'num-green'),
-    statCard('Thoát sớm', rows.filter(row => /THOÁT SỚM|EARLY/.test(journalResultText(row))).length, 'num-cyan'),
-    statCard('SL', rows.filter(row => /\bSL\b|STOP LOSS/.test(journalResultText(row))).length, 'num-red'),
-    statCard('TP1', rows.filter(row => /\bTP1\b/.test(journalResultText(row))).length, 'num-cyan'),
-    statCard('TP2', rows.filter(row => /\bTP2\b/.test(journalResultText(row))).length, 'num-green'),
-    statCard('R:R', formatJournalR(totalR) || '0R', totalR < 0 ? 'num-red' : totalR > 0 ? 'num-green' : '')
+    statCard('Tổng lệnh', rows.length, '', 'neutral'),
+    statCard('Đang chạy', rows.filter(isJournalRunning).length, 'num-cyan', 'cyan'),
+    statCard('Đã đóng', rows.filter(isJournalClosed).length, 'num-green', 'green'),
+    statCard('Thoát sớm', rows.filter(row => /THOÁT SỚM|EARLY/.test(journalResultText(row))).length, 'num-cyan', 'cyan'),
+    statCard('SL', rows.filter(row => /\bSL\b|STOP LOSS/.test(journalResultText(row))).length, 'num-red', 'red'),
+    statCard('TP1', rows.filter(row => /\bTP1\b/.test(journalResultText(row))).length, 'num-cyan', 'cyan'),
+    statCard('TP2', rows.filter(row => /\bTP2\b/.test(journalResultText(row))).length, 'num-green', 'green'),
+    statCard('R:R', formatJournalR(totalR) || '0R', totalR < 0 ? 'num-red' : totalR > 0 ? 'num-green' : '', totalTone)
   ].join('');
 }
 
