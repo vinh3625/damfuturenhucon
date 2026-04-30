@@ -257,7 +257,7 @@ h1 { margin: 0; font-size: 31px; letter-spacing: .8px; }
 .panel { padding: 16px; }
 .table-wrap { width: 100%; overflow-x: auto; }
 table { width: 100%; border-collapse: collapse; font-size: 14px; }
-th { color: #aebabe; font-weight: 700; text-align: left; padding: 10px 12px; background: rgba(255,255,255,.025); }
+th { color: #aebabe; font-weight: 700; text-align: left; padding: 10px 12px; background: rgba(255,255,255,.025); text-transform: uppercase; }
 td { padding: 12px; border-top: 1px solid rgba(180,230,255,.08); color: #e5eeec; }
 tr.selected { outline: 1px solid rgba(103,240,92,.74); outline-offset: -1px; background: rgba(67,240,92,.06); }
 .num-green { color: var(--trade-long); font-weight: 850; }
@@ -555,22 +555,22 @@ label { color: #b5c1c4; display: flex; align-items: center; gap: 8px; }
 .range-bars-summary {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 18px;
+  gap: 10px;
 }
 .range-bars-summary > div {
   min-width: 0;
-  min-height: 92px;
-  padding: 18px 20px;
+  min-height: 58px;
+  padding: 10px 12px;
   border: 1px solid rgba(255, 255, 255, .09);
-  border-radius: 16px;
+  border-radius: 12px;
   background: rgba(255, 255, 255, .035);
 }
 .range-bars-summary > div > span {
   display: block;
   color: var(--muted);
-  font-size: 15px;
+  font-size: 12px;
   font-weight: 750;
-  margin-bottom: 8px;
+  margin-bottom: 4px;
 }
 .range-bars-summary strong {
   display: block;
@@ -578,9 +578,9 @@ label { color: #b5c1c4; display: flex; align-items: center; gap: 8px; }
   overflow: visible;
   text-overflow: clip;
   white-space: normal;
-  font-size: 22px;
+  font-size: 15px;
   font-weight: 850;
-  line-height: 1.2;
+  line-height: 1.15;
 }
 .distribution { display:grid; grid-template-columns: 160px 1fr; gap: 20px; align-items:center; }
 .donut { width: 150px; height: 150px; border-radius: 50%; background: conic-gradient(var(--trade-tp1) 0 37%, var(--trade-tp2) 37% 68%, var(--trade-sl) 68% 89%, var(--yellow) 89% 100%); display:grid; place-items:center; position:relative; }
