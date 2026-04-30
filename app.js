@@ -410,6 +410,42 @@ function formatRiskReward(signal = {}) {
   return parts.length ? parts.join(' · ') : fallbackText || '--';
 }
 
+function getRRTone(rrText) {
+  const text = String(rrText || '').toUpperCase().trim();
+  if (text.startsWith('TP2')) return 'tp2';
+  if (text.startsWith('TP1')) return 'tp1';
+  if (text.startsWith('SL')) return 'sl';
+  return 'neutral';
+}
+
+function splitRRParts(rrText) {
+  const text = String(rrText || '').trim();
+  if (!text || text === '--') {
+    return { prefix: '--', value: '' };
+  }
+  const match = text.match(/^(TP1|TP2|SL)\s*(.*)$/i);
+  if (match) {
+    return {
+      prefix: match[1].toUpperCase(),
+      value: (match[2] || '').trim(),
+    };
+  }
+  return { prefix: text, value: '' };
+}
+
+function renderRRValue(rrText) {
+  const safe = String(rrText || '--').trim();
+  const tone = getRRTone(safe);
+  const parts = splitRRParts(safe);
+  return `<span class="rr-value rr-${tone}"><span class="rr-prefix">${parts.prefix}</span>${parts.value ? `<span class="rr-number">${parts.value}</span>` : ``}</span>`;
+}
+
+function renderRiskRewardHtml(signal = {}) {
+  const rrText = formatRiskReward(signal);
+  if (!rrText || rrText === '--') return '--';
+  return rrText.split(/\s*·\s*/).map(part => renderRRValue(part.trim())).join('<span class="rr-separator"> · </span>');
+}
+
 function publicLogType(type) {
   return type === 'Hệ thống' ? 'Trạng thái' : safe(type);
 }
@@ -1450,7 +1486,7 @@ function renderHome() {
     </div>
     <div class="latest-extra">
       ${field('Trạng thái', `<span class="badge ${statusClass(latestStatus)} ${metricChanged('latest_signal.status') ? 'value-updated' : ''}">${latestStatus}</span>`)}
-      ${field('R:R', renderTextWithRUnits(formatRiskReward(l)), 'num-cyan')}
+      ${field('R:R', renderRiskRewardHtml(l))}
       ${field('Độ tự tin', l.confidence, 'num-green')}
       ${field('Thời gian', formatItemDateTimeVN(l))}
     </div>
