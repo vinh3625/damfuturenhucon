@@ -4,11 +4,18 @@
   --panel2: #07100e;
   --line: rgba(120, 255, 140, 0.20);
   --line2: rgba(64, 210, 255, 0.22);
-  --green: #67f05c;
+  --trade-long: #58ff60;
+  --trade-short: #ff505c;
+  --trade-entry: #6aa7d8;
+  --trade-sl: #ff505c;
+  --trade-tp1: #58ff60;
+  --trade-tp2: #ffd24a;
+  --trade-neutral: rgba(205, 218, 220, .88);
+  --green: var(--trade-long);
   --green2: #39cf56;
   --cyan: #37c8ff;
-  --yellow: #ffc247;
-  --red: #ff4d4f;
+  --yellow: var(--trade-tp2);
+  --red: var(--trade-short);
   --text: #eef7f2;
   --muted: #93a2a7;
   --card-shadow: 0 18px 40px rgba(0, 0, 0, .50), 0 0 14px rgba(90, 255, 105, .06);
@@ -162,12 +169,34 @@ h1 { margin: 0; font-size: 31px; letter-spacing: .8px; }
 .field-label { color: #b2bec2; font-size: 13px; margin-bottom: 7px; }
 .field-value { font-size: 21px; font-weight: 850; }
 .badge { display: inline-flex; align-items:center; justify-content:center; padding: 5px 12px; border-radius: 9px; font-size: 13px; font-weight: 900; border: 1px solid currentColor; background: rgba(255,255,255,.04); white-space: nowrap; }
-.badge.long, .pos { color: var(--green); }
-.badge.short, .neg { color: var(--red); }
+.trade-long, .long, .badge.long, .pos { color: var(--trade-long); }
+.trade-short, .short, .badge.short, .neg { color: var(--trade-short); }
+.trade-entry { color: var(--trade-entry); font-weight: 850; }
+.trade-sl, .badge.sl { color: var(--trade-sl); }
+.trade-tp1, .badge.tp1 { color: var(--trade-tp1); }
+.trade-tp2, .badge.tp2 { color: var(--trade-tp2); }
+.trade-neutral { color: var(--trade-neutral); }
 .badge.wait { color: var(--yellow); }
 .badge.info { color: var(--cyan); }
 .badge.green { color: var(--green); }
 .badge.neutral { color: var(--muted); }
+.badge.long {
+  border-color: rgba(88, 255, 96, .70);
+  background: rgba(88, 255, 96, .08);
+}
+.badge.short,
+.badge.sl {
+  border-color: rgba(255, 80, 92, .70);
+  background: rgba(255, 80, 92, .08);
+}
+.badge.tp1 {
+  border-color: rgba(88, 255, 96, .70);
+  background: rgba(88, 255, 96, .08);
+}
+.badge.tp2 {
+  border-color: rgba(255, 210, 74, .75);
+  background: rgba(255, 210, 74, .10);
+}
 .latest-extra { margin-top: 16px; padding-top: 14px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; border-top: 1px dashed rgba(255,255,255,.18); }
 .target-mark { justify-self: end; width: 90px; height: 90px; border-radius: 50%; border: 3px solid var(--green); display:grid; place-items:center; color:var(--green); font-size:46px; box-shadow: 0 0 14px rgba(103,240,92,.18); }
 .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
@@ -231,9 +260,11 @@ table { width: 100%; border-collapse: collapse; font-size: 14px; }
 th { color: #aebabe; font-weight: 700; text-align: left; padding: 10px 12px; background: rgba(255,255,255,.025); }
 td { padding: 12px; border-top: 1px solid rgba(180,230,255,.08); color: #e5eeec; }
 tr.selected { outline: 1px solid rgba(103,240,92,.74); outline-offset: -1px; background: rgba(67,240,92,.06); }
-.num-green { color: var(--green); font-weight: 850; }
-.num-red { color: var(--red); font-weight: 850; }
+.num-green { color: var(--trade-long); font-weight: 850; }
+.num-red { color: var(--trade-short); font-weight: 850; }
 .num-cyan { color: var(--cyan); font-weight: 850; }
+.num-yellow { color: var(--trade-tp2); font-weight: 850; }
+.num-neutral { color: var(--trade-neutral); font-weight: 850; }
 .live-list { border: 1px solid rgba(255,255,255,.08); border-radius: 10px; overflow: hidden; }
 .live-row { display: grid; grid-template-columns: 110px 1fr 150px; gap: 10px; padding: 10px 14px; border-top: 1px solid rgba(255,255,255,.07); }
 .live-row:first-child { border-top: 0; }
@@ -505,11 +536,11 @@ label { color: #b5c1c4; display: flex; align-items: center; gap: 8px; }
   shape-rendering: geometricPrecision;
 }
 .range-axis-bar.positive {
-  fill: #48dc63;
+  fill: var(--trade-long);
   filter: drop-shadow(0 0 6px rgba(103, 240, 92, .16));
 }
 .range-axis-bar.negative {
-  fill: #e44950;
+  fill: var(--trade-short);
   filter: drop-shadow(0 0 6px rgba(255, 77, 79, .14));
 }
 .range-axis-bar.zero {
@@ -519,8 +550,8 @@ label { color: #b5c1c4; display: flex; align-items: center; gap: 8px; }
   font-size: 12px;
   font-weight: 900;
 }
-.range-axis-value.positive { fill: var(--green); }
-.range-axis-value.negative { fill: var(--red); }
+.range-axis-value.positive { fill: var(--trade-long); }
+.range-axis-value.negative { fill: var(--trade-short); }
 .range-bars-summary {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -548,7 +579,7 @@ label { color: #b5c1c4; display: flex; align-items: center; gap: 8px; }
   font-size: 13px;
 }
 .distribution { display:grid; grid-template-columns: 160px 1fr; gap: 20px; align-items:center; }
-.donut { width: 150px; height: 150px; border-radius: 50%; background: conic-gradient(var(--green) 0 37%, var(--cyan) 37% 68%, var(--red) 68% 89%, var(--yellow) 89% 100%); display:grid; place-items:center; position:relative; }
+.donut { width: 150px; height: 150px; border-radius: 50%; background: conic-gradient(var(--trade-tp1) 0 37%, var(--trade-tp2) 37% 68%, var(--trade-sl) 68% 89%, var(--yellow) 89% 100%); display:grid; place-items:center; position:relative; }
 .donut::after { content:""; position:absolute; width: 88px; height:88px; border-radius:50%; background:#061115; }
 .donut-inner { position:relative; z-index:1; text-align:center; }
 .donut-inner strong { font-size: 30px; }
@@ -767,15 +798,15 @@ label { color: #b5c1c4; display: flex; align-items: center; gap: 8px; }
 }
 .journal-stat-green {
   background:
-    radial-gradient(circle at 18% 0%, rgba(103, 240, 92, .28), transparent 45%),
+    radial-gradient(circle at 18% 0%, rgba(88, 255, 96, .28), transparent 45%),
     linear-gradient(180deg, rgba(6, 30, 15, .96), rgba(4, 14, 14, .90));
-  border-color: rgba(103, 240, 92, .50);
+  border-color: rgba(88, 255, 96, .50);
   box-shadow:
     0 18px 40px rgba(0, 0, 0, .50),
-    0 0 22px rgba(103, 240, 92, .15),
+    0 0 22px rgba(88, 255, 96, .15),
     inset 0 1px 0 rgba(255, 255, 255, .08);
 }
-.journal-stat-green::before { background: rgba(103, 240, 92, .34); }
+.journal-stat-green::before { background: rgba(88, 255, 96, .34); }
 .journal-stat-red {
   background:
     radial-gradient(circle at 18% 0%, rgba(255, 80, 92, .30), transparent 45%),
@@ -798,6 +829,17 @@ label { color: #b5c1c4; display: flex; align-items: center; gap: 8px; }
     inset 0 1px 0 rgba(255, 255, 255, .08);
 }
 .journal-stat-cyan::before { background: rgba(55, 200, 255, .34); }
+.journal-stat-yellow {
+  background:
+    radial-gradient(circle at 18% 0%, rgba(255, 210, 74, .28), transparent 45%),
+    linear-gradient(180deg, rgba(45, 34, 8, .96), rgba(18, 14, 6, .91));
+  border-color: rgba(255, 210, 74, .48);
+  box-shadow:
+    0 18px 40px rgba(0, 0, 0, .50),
+    0 0 22px rgba(255, 210, 74, .13),
+    inset 0 1px 0 rgba(255, 255, 255, .08);
+}
+.journal-stat-yellow::before { background: rgba(255, 210, 74, .34); }
 .journal-stat-neutral {
   background:
     radial-gradient(circle at 18% 0%, rgba(150, 232, 255, .20), transparent 45%),
@@ -815,10 +857,10 @@ label { color: #b5c1c4; display: flex; align-items: center; gap: 8px; }
   filter: brightness(1.08);
 }
 .journal-stat-green:hover {
-  border-color: rgba(103, 240, 92, .72);
+  border-color: rgba(88, 255, 96, .72);
   box-shadow:
     0 22px 52px rgba(0, 0, 0, .58),
-    0 0 34px rgba(103, 240, 92, .25);
+    0 0 34px rgba(88, 255, 96, .25);
 }
 .journal-stat-red:hover {
   border-color: rgba(255, 95, 110, .74);
@@ -831,6 +873,12 @@ label { color: #b5c1c4; display: flex; align-items: center; gap: 8px; }
   box-shadow:
     0 22px 52px rgba(0, 0, 0, .58),
     0 0 34px rgba(55, 200, 255, .25);
+}
+.journal-stat-yellow:hover {
+  border-color: rgba(255, 210, 74, .70);
+  box-shadow:
+    0 22px 52px rgba(0, 0, 0, .58),
+    0 0 34px rgba(255, 210, 74, .23);
 }
 .journal-stat-neutral:hover {
   border-color: rgba(150, 232, 255, .52);
@@ -1391,8 +1439,9 @@ tr.selected {
 
 .badge.green,
 .badge.info,
-.badge.long {
-  box-shadow: inset 0 0 16px rgba(103, 240, 92, 0.04);
+.badge.long,
+.badge.tp1 {
+  box-shadow: inset 0 0 16px rgba(88, 255, 96, 0.04);
 }
 
 .empty-state {
@@ -2234,7 +2283,7 @@ body.data-refreshing .live-badge {
 }
 
 .r-display.neutral {
-  color: rgba(235, 245, 242, 0.82);
+  color: var(--trade-neutral);
 }
 
 .r-display.positive .r-unit,

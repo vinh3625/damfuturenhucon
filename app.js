@@ -303,7 +303,23 @@ function renderSvgRText(text) {
 function renderSvgRValue(value, options = {}) {
   return renderSvgRText(`${formatRNumber(value, options.digits ?? 1)}R`);
 }
-const clsDir = (d) => safeStatus(d) === 'LONG' ? 'long' : 'short';
+function rToneClass(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return 'num-neutral';
+  if (number > 0) return 'num-green';
+  if (number < 0) return 'num-red';
+  return 'num-neutral';
+}
+function tradeOutcomeColor(value) {
+  const text = safeStatus(value).toUpperCase();
+  if (text.includes('TP2')) return 'var(--trade-tp2)';
+  if (text.includes('TP1')) return 'var(--trade-tp1)';
+  if (text.includes('SL') || text.includes('STOP LOSS')) return 'var(--trade-sl)';
+  if (text.includes('LONG')) return 'var(--trade-long)';
+  if (text.includes('SHORT')) return 'var(--trade-short)';
+  return 'var(--trade-neutral)';
+}
+const clsDir = (d) => safeStatus(d).toUpperCase() === 'LONG' ? 'long' : 'short';
 const iconFor = (symbol = '') => coinIconMap[safeStatus(symbol).replace('USDT', '')] || '◎';
 const metricChanged = (...keys) => keys.some(key => changedMetrics.has(key));
 const isMissingPrice = (value) => {
@@ -1429,7 +1445,7 @@ function renderHome() {
     <div class="panel-title">🔥 Tín hiệu mới nhất</div>
     <div class="latest-grid">
       <div class="signal-symbol"><span class="coin-icon ${metricChanged('latest_signal.symbol') ? 'soft-pulse' : ''}">${iconFor(latestSymbol)}</span><span class="big-symbol ${metricChanged('latest_signal.symbol') ? 'value-flash' : ''}">${renderSymbol(latestSymbol)}</span><span class="badge ${clsDir(latestDirection)}">${latestDirection}</span></div>
-      ${field('Khung', l.timeframe)}${field('Entry', formatMaybePrice(l.entry))}${field('SL', formatMaybePrice(l.sl), 'num-red')}${field('TP1', formatMaybePrice(l.tp1), 'num-green')}${field('TP2', formatMaybePrice(l.tp2), 'num-green')}
+      ${field('Khung', l.timeframe)}${field('Entry', formatMaybePrice(l.entry), 'trade-entry')}${field('SL', formatMaybePrice(l.sl), 'trade-sl')}${field('TP1', formatMaybePrice(l.tp1), 'trade-tp1')}${field('TP2', formatMaybePrice(l.tp2), 'trade-tp2')}
       <div class="target-mark">◎</div>
     </div>
     <div class="latest-extra">
@@ -1549,9 +1565,9 @@ function readTotalSignals() {
 function signalDistributionItems() {
   const outcomes = readOutcomeCounts();
   return [
-    { label: 'SL', count: outcomes.SL, color: 'var(--red)', cls: 'num-red' },
-    { label: 'TP1', count: outcomes.TP1, color: 'var(--cyan)', cls: 'num-cyan' },
-    { label: 'TP2', count: outcomes.TP2, color: 'var(--green)', cls: 'num-green' }
+    { label: 'SL', count: outcomes.SL, color: tradeOutcomeColor('SL'), cls: 'num-red' },
+    { label: 'TP1', count: outcomes.TP1, color: tradeOutcomeColor('TP1'), cls: 'num-green' },
+    { label: 'TP2', count: outcomes.TP2, color: tradeOutcomeColor('TP2'), cls: 'num-yellow' }
   ];
 }
 
@@ -1609,7 +1625,7 @@ function renderRecentResults() {
         ${renderTradeDuration(r)}
         <span><span class="badge ${clsDir(r.direction)}">${safe(r.direction)}</span></span>
         <strong><span class="badge ${statusClass(status)}">${status}</span></strong>
-        <strong class="result-r-cell ${safeNumber(rValue) < 0 ? 'num-red' : 'num-green'}">${rValue === null ? '--' : renderRValue(rValue)}</strong>
+        <strong class="result-r-cell ${rToneClass(rValue)}">${rValue === null ? '--' : renderRValue(rValue)}</strong>
       </div>`;
     }).join('')}
       </div>`
@@ -1692,7 +1708,7 @@ function field(label, value, cls = '') {
 
 function tradeRow(t, changed = false) {
   const status = getTradeOutcomeStatus(t);
-  return `<tr class="${changed ? 'row-enter' : ''}"><td>${renderPairTimeCell(t, { timeReader: getTradeOpenTime })}</td><td>${renderRunningDuration(t)}</td><td class="${clsDir(t.direction)}"><strong>${safe(t.direction)}</strong></td><td>${formatMaybePrice(t.entry)}</td><td>${formatMaybePrice(t.tp1)}</td><td>${formatMaybePrice(t.tp2)}</td><td class="num-red">${formatMaybePrice(t.sl)}</td><td><span class="badge ${statusClass(status)}">${status}</span></td></tr>`;
+  return `<tr class="${changed ? 'row-enter' : ''}"><td>${renderPairTimeCell(t, { timeReader: getTradeOpenTime })}</td><td>${renderRunningDuration(t)}</td><td class="${clsDir(t.direction)}"><strong>${safe(t.direction)}</strong></td><td class="trade-entry">${formatMaybePrice(t.entry)}</td><td class="trade-tp1">${formatMaybePrice(t.tp1)}</td><td class="trade-tp2">${formatMaybePrice(t.tp2)}</td><td class="trade-sl">${formatMaybePrice(t.sl)}</td><td><span class="badge ${statusClass(status)}">${status}</span></td></tr>`;
 }
 
 function renderSystemMini(id) {
@@ -1754,7 +1770,7 @@ function renderSignalTable() {
     return `<tr data-signal-index="${idx}">
       <td>${renderPairTimeCell(sig)}</td>
       <td class="${clsDir(sig.direction)}"><strong>${safe(sig.direction, 'LONG')}</strong></td>
-      <td>${safe(sig.timeframe)}</td><td>${formatMaybePrice(sig.entry)}</td><td class="num-red">${formatMaybePrice(sig.sl)}</td><td class="num-green">${formatMaybePrice(sig.tp1)}</td><td class="num-green">${formatMaybePrice(sig.tp2)}</td>
+      <td>${safe(sig.timeframe)}</td><td class="trade-entry">${formatMaybePrice(sig.entry)}</td><td class="trade-sl">${formatMaybePrice(sig.sl)}</td><td class="trade-tp1">${formatMaybePrice(sig.tp1)}</td><td class="trade-tp2">${formatMaybePrice(sig.tp2)}</td>
       <td><span class="badge ${statusClass(status)}">${status}</span></td>
       <td><strong class="signal-result-r">${renderTradeResultR(sig)}</strong></td>
     </tr>`;
@@ -1764,9 +1780,10 @@ function renderSignalTable() {
 
 function statusClass(status) {
   const text = safeStatus(status).toUpperCase();
-  if (text.includes('SL')) return 'short';
-  if (text.includes('TP2') || text.includes('ĐANG CHẠY') || text.includes('DANG CHAY')) return 'green';
-  if (text.includes('TP1')) return 'info';
+  if (text.includes('SL')) return 'sl';
+  if (text.includes('TP2')) return 'tp2';
+  if (text.includes('TP1')) return 'tp1';
+  if (text.includes('ĐANG CHẠY') || text.includes('DANG CHAY')) return 'long';
   if (text.includes('CHỜ') || text.includes('CHO') || text.includes('PENDING') || text.includes('THOÁT') || text.includes('THOAT')) return 'wait';
   if (text.includes('HÒA VỐN') || text.includes('HOA VON')) return 'neutral';
   if (text.includes('ĐÓNG TAY') || text.includes('DONG TAY') || text.includes('ĐÃ ĐÓNG') || text.includes('DA DONG')) return 'info';
@@ -1789,7 +1806,7 @@ function renderPerformance() {
   renderPerformanceDistribution();
   const pairPerformance = arr(dashboardData.pair_performance);
   document.getElementById('pairPerfBody').innerHTML = pairPerformance.length
-    ? pairPerformance.map(p => `<tr><td><strong>${renderSymbolWithIcon(p.symbol, 'width:28px;height:28px;font-size:14px;margin-right:8px')}</strong></td><td>${safeNumber(p.trades)}</td><td class="num-green">${safeNumber(p.win_rate)}%</td><td class="${safeNumber(p.r) < 0 ? 'num-red' : 'num-green'}">${renderRValue(p.r)}</td></tr>`).join('')
+    ? pairPerformance.map(p => `<tr><td><strong>${renderSymbolWithIcon(p.symbol, 'width:28px;height:28px;font-size:14px;margin-right:8px')}</strong></td><td>${safeNumber(p.trades)}</td><td class="num-green">${safeNumber(p.win_rate)}%</td><td class="${rToneClass(p.r)}">${renderRValue(p.r)}</td></tr>`).join('')
     : '<tr><td colspan="4" class="empty-state">Chưa có hiệu suất theo cặp</td></tr>';
   const best = pairPerformance.slice().sort((a, b) => safeNumber(b.r) - safeNumber(a.r))[0] || {};
   document.getElementById('insights').innerHTML = `<div class="panel-title">🎯 Insights nhanh</div>
@@ -1836,7 +1853,7 @@ function renderPerformanceOverviewStats() {
   const target = document.getElementById('performanceOverviewStats');
   if (!target) return;
   target.innerHTML = [
-    homeMetric('Tổng PnL', renderRValue(s.total_r), safeNumber(s.total_r) < 0 ? 'num-red' : 'num-green'),
+    homeMetric('Tổng PnL', renderRValue(s.total_r), rToneClass(s.total_r)),
     homeMetric('Win rate', `${safeNumber(s.win_rate)}%`, 'num-green'),
     homeMetric('Số lệnh', safeNumber(s.total_signals), 'num-cyan')
   ].join('');
@@ -2279,10 +2296,10 @@ function renderRangeResultAxisCard(buckets, range = selectedTimeRange) {
       <div class="range-axis-dom-labels" aria-hidden="true"><span>Độ lớn R</span><span>Thời gian</span></div>
       <div class="range-result-plot">${renderRangeResultAxisChart(buckets, range)}</div>
       <div class="range-bars-summary">
-        <div><span>Tổng R</span><strong class="${totalR < 0 ? 'num-red' : totalR > 0 ? 'num-green' : ''}">${renderRValue(totalR)}</strong></div>
+        <div><span>Tổng R</span><strong class="${rToneClass(totalR)}">${renderRValue(totalR)}</strong></div>
         <div><span>Số lệnh</span><strong>${safeNumber(totalTrades)}</strong></div>
-        <div><span>Tốt nhất</span><strong class="${safeNumber(best.r) > 0 ? 'num-green' : ''}">${escapeHtml(best.label || '--')} · ${renderRValue(best.r)}</strong></div>
-        <div><span>Xấu nhất</span><strong class="${safeNumber(worst.r) < 0 ? 'num-red' : ''}">${escapeHtml(worst.label || '--')} · ${renderRValue(worst.r)}</strong></div>
+        <div><span>Tốt nhất</span><strong class="${rToneClass(best.r)}">${escapeHtml(best.label || '--')} · ${renderRValue(best.r)}</strong></div>
+        <div><span>Xấu nhất</span><strong class="${rToneClass(worst.r)}">${escapeHtml(worst.label || '--')} · ${renderRValue(worst.r)}</strong></div>
       </div>
     </div>`;
 }
@@ -2291,7 +2308,7 @@ function renderDistribution(targetId = 'distribution') {
   const target = document.getElementById(targetId);
   if (!target) return;
   const total = arr(dashboardData.result_distribution).reduce((sum, item) => sum + safeNumber(item.count), 0);
-  target.innerHTML = `<div class="donut"><div class="donut-inner"><strong>${total}</strong><br><span>Lệnh đóng</span></div></div><div class="legend-list">${arr(dashboardData.result_distribution).map((x, i) => `<div><span class="dot" style="background:${['var(--green)', 'var(--cyan)', 'var(--red)', 'var(--yellow)'][i]}"></span> ${safe(x.label)} <strong style="float:right">${safeNumber(x.count)} (${safeNumber(x.percent)}%)</strong></div>`).join('')}<small>Lệnh đóng: ${total}</small></div>`;
+  target.innerHTML = `<div class="donut"><div class="donut-inner"><strong>${total}</strong><br><span>Lệnh đóng</span></div></div><div class="legend-list">${arr(dashboardData.result_distribution).map(x => `<div><span class="dot" style="background:${tradeOutcomeColor(x.label)}"></span> ${safe(x.label)} <strong style="float:right">${safeNumber(x.count)} (${safeNumber(x.percent)}%)</strong></div>`).join('')}<small>Lệnh đóng: ${total}</small></div>`;
 }
 
 function renderLogs() {
@@ -2547,8 +2564,8 @@ function formatPositionValue(value) {
 function journalResultClass(result) {
   const text = safeStatus(result).toUpperCase();
   if (text.includes('SL')) return 'num-red';
-  if (text.includes('TP2')) return 'num-green';
-  if (text.includes('TP')) return 'num-cyan';
+  if (text.includes('TP2')) return 'num-yellow';
+  if (text.includes('TP1') || text.includes('TP')) return 'num-green';
   return 'muted-text';
 }
 
@@ -2591,7 +2608,7 @@ function journalResultText(row) {
 }
 
 function statCard(label, value, cls = '', tone = 'neutral') {
-  const resolvedTone = ['neutral', 'cyan', 'green', 'red'].includes(tone) ? tone : 'neutral';
+  const resolvedTone = ['neutral', 'cyan', 'green', 'red', 'yellow'].includes(tone) ? tone : 'neutral';
   return `<div class="journal-stat-card journal-stat-${resolvedTone}"><span class="journal-stat-label">${label}</span><strong class="${cls}">${safe(value)}</strong></div>`;
 }
 
@@ -2606,9 +2623,9 @@ function renderJournalQuickStats(rows) {
     statCard('Đã đóng', rows.filter(isJournalClosed).length, 'num-green', 'green'),
     statCard('Thoát sớm', rows.filter(row => /THOÁT SỚM|EARLY/.test(journalResultText(row))).length, 'num-cyan', 'cyan'),
     statCard('SL', rows.filter(row => /\bSL\b|STOP LOSS/.test(journalResultText(row))).length, 'num-red', 'red'),
-    statCard('TP1', rows.filter(row => /\bTP1\b/.test(journalResultText(row))).length, 'num-cyan', 'cyan'),
-    statCard('TP2', rows.filter(row => /\bTP2\b/.test(journalResultText(row))).length, 'num-green', 'green'),
-    statCard('R:R', renderRText(formatJournalR(totalR) || '0R'), totalR < 0 ? 'num-red' : totalR > 0 ? 'num-green' : '', totalTone)
+    statCard('TP1', rows.filter(row => /\bTP1\b/.test(journalResultText(row))).length, 'num-green', 'green'),
+    statCard('TP2', rows.filter(row => /\bTP2\b/.test(journalResultText(row))).length, 'num-yellow', 'yellow'),
+    statCard('R:R', renderRText(formatJournalR(totalR) || '0R'), rToneClass(totalR), totalTone)
   ].join('');
 }
 
@@ -2711,10 +2728,10 @@ function renderTradeJournal() {
         <td>${renderPairTimeCell(row)}</td>
         <td><span class="badge ${directionClass}">${direction}</span></td>
         <td>${safe(row.timeframe)}</td>
-        <td>${formatTradeNumber(row.entry)}</td>
-        <td class="num-red">${formatTradeNumber(row.sl)}</td>
-        <td class="num-cyan">${formatTradeNumber(row.tp1)}</td>
-        <td class="num-green">${formatTradeNumber(row.tp2)}</td>
+        <td class="trade-entry">${formatTradeNumber(row.entry)}</td>
+        <td class="trade-sl">${formatTradeNumber(row.sl)}</td>
+        <td class="trade-tp1">${formatTradeNumber(row.tp1)}</td>
+        <td class="trade-tp2">${formatTradeNumber(row.tp2)}</td>
         <td>${formatPositionValue(row.position_value)}</td>
         <td><span class="badge ${statusClass(status)}">${status}</span></td>
         <td><strong class="${journalResultClass(result)}">${result}</strong></td>
@@ -3067,7 +3084,8 @@ function highlightMessage(message) {
     .replace(/\b([A-Z0-9]{2,20}USDT)\b/g, symbol => renderSymbol(symbol))
     .replace(/\bLONG\b/g, '<strong class="pos">LONG</strong>')
     .replace(/\bSHORT\b/g, '<strong class="neg">SHORT</strong>')
-    .replace(/TP1|TP2/g, '<strong class="num-green">$&</strong>')
+    .replace(/TP1/g, '<strong class="trade-tp1">TP1</strong>')
+    .replace(/TP2/g, '<strong class="trade-tp2">TP2</strong>')
     .replace(/\bSL\b/g, '<strong class="num-red">SL</strong>');
 }
 
