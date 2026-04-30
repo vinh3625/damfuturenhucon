@@ -529,18 +529,50 @@ label { color: #b5c1c4; display: flex; align-items: center; gap: 8px; }
   display: flex;
   flex-direction: column;
   gap: 4px;
+  cursor: pointer;
+  transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease, filter .18s ease;
+}
+.daily-profit-card:hover {
+  transform: translateY(-3px);
+  filter: brightness(1.08);
 }
 .daily-profit-card.positive {
   background: rgba(28, 84, 45, .85);
   border-color: rgba(88, 255, 96, .28);
 }
+.daily-profit-card.positive:hover {
+  box-shadow: 0 12px 28px rgba(88, 255, 96, .18);
+  border-color: rgba(88, 255, 96, .55);
+}
 .daily-profit-card.negative {
   background: rgba(96, 28, 36, .85);
   border-color: rgba(255, 95, 110, .28);
 }
+.daily-profit-card.negative:hover {
+  box-shadow: 0 12px 28px rgba(255, 80, 92, .20);
+  border-color: rgba(255, 95, 110, .55);
+}
 .daily-profit-card.neutral {
   background: rgba(80, 86, 92, .75);
   border-color: rgba(180, 190, 200, .18);
+}
+.daily-profit-card.neutral:hover {
+  box-shadow: 0 12px 28px rgba(180, 190, 200, .16);
+  border-color: rgba(180, 190, 200, .42);
+}
+.daily-profit-card.active {
+  transform: translateY(-3px);
+  outline: 2px solid rgba(255, 255, 255, .38);
+  outline-offset: 2px;
+}
+.daily-profit-card.positive.active {
+  box-shadow: 0 0 0 1px rgba(88, 255, 96, .65), 0 14px 34px rgba(88, 255, 96, .22);
+}
+.daily-profit-card.negative.active {
+  box-shadow: 0 0 0 1px rgba(255, 95, 110, .65), 0 14px 34px rgba(255, 80, 92, .24);
+}
+.daily-profit-card.neutral.active {
+  box-shadow: 0 0 0 1px rgba(180, 190, 200, .55), 0 14px 34px rgba(180, 190, 200, .18);
 }
 .daily-profit-date {
   font-size: .9rem;
@@ -549,15 +581,34 @@ label { color: #b5c1c4; display: flex; align-items: center; gap: 8px; }
   line-height: 1.15;
 }
 .daily-profit-r {
-  font-size: 1.1rem;
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+  line-height: 1.1;
+}
+.daily-profit-value {
+  font-size: 1.18rem;
   font-weight: 900;
   color: #fff;
-  line-height: 1.15;
+}
+.daily-profit-unit {
+  font-size: .78rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, .72);
+  letter-spacing: .02em;
 }
 .daily-profit-empty {
   color: var(--muted);
   font-size: 13px;
   padding: 4px 0;
+}
+.journal-day-highlight {
+  background: rgba(255, 210, 74, .12) !important;
+  box-shadow: inset 4px 0 0 rgba(255, 210, 74, .85);
+}
+.journal-day-highlight td {
+  border-top-color: rgba(255, 210, 74, .25);
+  border-bottom-color: rgba(255, 210, 74, .16);
 }
 .journal-card-head {
   display: flex;

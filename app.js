@@ -16,6 +16,8 @@ let realtimeReconnectAttempt = 0;
 let realtimeConnected = false;
 let fallbackPollTimer = null;
 let lastDataReceivedAt = null;
+let selectedDailyProfitDayKey = null;
+let shouldScrollToSelectedDay = false;
 
 const REALTIME_WORKER_URL = "https://bingx-dashboard-realtime.nguyenvanvinh030625.workers.dev";
 const DASHBOARD_API_URL = `${REALTIME_WORKER_URL}/dashboard`;
@@ -1699,7 +1701,12 @@ function renderLineChart(targetId = 'lineChart') {
 
   // v3: keep every visual element inside the SVG viewBox so the chart
   // never escapes the card/div on real browser sizes.
-  const w = 820, h = 320;
+  const rect = target.getBoundingClientRect();
+  const panelRect = target.closest('.panel')?.getBoundingClientRect();
+  const measuredWidth = rect.width || target.clientWidth || (panelRect?.width ? panelRect.width - 32 : 0) || 900;
+  const measuredHeight = rect.height || target.clientHeight || 320;
+  const w = Math.max(720, Math.round(measuredWidth));
+  const h = Math.max(220, Math.round(measuredHeight));
   const padL = 54, padR = 92, padT = 26, padB = 44;
   const ys = data.map(d => safeNumber(d.r));
   const axis = buildLineChartAxis(ys);
@@ -1738,7 +1745,7 @@ function renderLineChart(targetId = 'lineChart') {
   const tagFill = isNegative ? 'rgba(255,77,79,.18)' : isPositive ? 'rgba(103,240,92,.18)' : 'rgba(180,195,200,.14)';
   const tagStroke = isNegative ? 'rgba(255,77,79,.8)' : isPositive ? 'rgba(103,240,92,.8)' : 'rgba(180,195,200,.55)';
 
-  target.innerHTML = `<svg class="performance-svg" viewBox="0 0 ${w} ${h}">${grid}<polygon class="performance-area ${areaClass}" points="${area}"/>${lineSegments}${markers}<line class="chart-grid" stroke-dasharray="5 5" x1="${padL}" x2="${w-padR+14}" y1="${y(0)}" y2="${y(0)}"/>${labels}<rect x="${bx}" y="${by}" width="70" height="26" rx="9" fill="${tagFill}" stroke="${tagStroke}"/><text class="performance-label ${finalTone}" x="${bx+8}" y="${by+18}" font-size="15" font-weight="800">${fmtR(last.r)}</text></svg>`;
+  target.innerHTML = `<svg class="performance-svg" viewBox="0 0 ${w} ${h}" width="100%" height="100%">${grid}<polygon class="performance-area ${areaClass}" points="${area}"/>${lineSegments}${markers}<line class="chart-grid" stroke-dasharray="5 5" x1="${padL}" x2="${w-padR+14}" y1="${y(0)}" y2="${y(0)}"/>${labels}<rect x="${bx}" y="${by}" width="70" height="26" rx="9" fill="${tagFill}" stroke="${tagStroke}"/><text class="performance-label ${finalTone}" x="${bx+8}" y="${by+18}" font-size="15" font-weight="800">${fmtR(last.r)}</text></svg>`;
 }
 
 function performancePointLabel(point = {}) {
@@ -2386,6 +2393,14 @@ function dailyProfitTone(value) {
   return 'neutral';
 }
 
+function dailyProfitRParts(value) {
+  const text = fmtR(value);
+  return {
+    value: text.replace(/R$/, ''),
+    unit: 'R'
+  };
+}
+
 function dailyProfitRows(rows = []) {
   const groups = new Map();
   arr(rows).forEach(row => {
@@ -2415,12 +2430,28 @@ function renderDailyProfitCards(rows = []) {
   const target = document.getElementById('dailyProfitGrid');
   if (!target) return;
   const days = dailyProfitRows(rows);
+  if (selectedDailyProfitDayKey && !days.some(day => day.key === selectedDailyProfitDayKey)) {
+    selectedDailyProfitDayKey = null;
+    shouldScrollToSelectedDay = false;
+  }
   target.innerHTML = days.length
-    ? days.map(day => `<div class="daily-profit-card ${dailyProfitTone(day.r)}">
+    ? days.map(day => {
+      const parts = dailyProfitRParts(day.r);
+      const active = selectedDailyProfitDayKey === day.key ? ' active' : '';
+      return `<div class="daily-profit-card ${dailyProfitTone(day.r)}${active}" data-day-key="${escapeHtml(day.key)}" role="button" tabindex="0" aria-pressed="${selectedDailyProfitDayKey === day.key ? 'true' : 'false'}">
       <div class="daily-profit-date">${escapeHtml(day.label)}</div>
-      <div class="daily-profit-r">${fmtR(day.r)}</div>
-    </div>`).join('')
+      <div class="daily-profit-r"><span class="daily-profit-value">${escapeHtml(parts.value)}</span><span class="daily-profit-unit">${escapeHtml(parts.unit)}</span></div>
+    </div>`;
+    }).join('')
     : '<div class="daily-profit-empty">Chưa có dữ liệu lãi/lỗ theo ngày</div>';
+}
+
+function handleDailyProfitCardSelect(card) {
+  const dayKey = card?.dataset?.dayKey;
+  if (!dayKey) return;
+  selectedDailyProfitDayKey = selectedDailyProfitDayKey === dayKey ? null : dayKey;
+  shouldScrollToSelectedDay = Boolean(selectedDailyProfitDayKey);
+  renderTradeJournal();
 }
 
 function renderTradeJournal() {
@@ -2440,7 +2471,10 @@ function renderTradeJournal() {
       const direction = safe(row.direction);
       const directionClass = direction === 'LONG' ? 'long' : direction === 'SHORT' ? 'short' : 'info';
       const result = formatJournalResult(row);
-      return `<tr>
+      const dayKey = formatDateKeyVN(getDailyProfitTimestamp(row), row);
+      const highlightClass = dayKey && selectedDailyProfitDayKey === dayKey ? ' class="journal-day-highlight"' : '';
+      const dayAttr = dayKey ? ` data-trade-day="${escapeHtml(dayKey)}"` : '';
+      return `<tr${dayAttr}${highlightClass}>
         <td class="journal-time">${formatSystemDateTime(row.time)}</td>
         <td><strong>${renderSymbol(row.symbol)}</strong></td>
         <td><span class="badge ${directionClass}">${direction}</span></td>
@@ -2455,6 +2489,12 @@ function renderTradeJournal() {
       </tr>`;
     }).join('')
     : '<tr><td colspan="11" class="empty-state">Chưa có nhật ký giao dịch.</td></tr>';
+
+  if (shouldScrollToSelectedDay) {
+    const firstHighlighted = document.querySelector('.journal-day-highlight');
+    firstHighlighted?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    shouldScrollToSelectedDay = false;
+  }
 }
 
 function renderSystemSummary() {
@@ -2811,6 +2851,9 @@ function bindEvents() {
     if (panel) {
       panel.classList.add('active', 'tab-transitioning');
       setTimeout(() => panel.classList.remove('tab-transitioning'), 260);
+      if (button.dataset.tab === 'performance') {
+        requestAnimationFrame(() => renderLineChart());
+      }
     }
   }));
 
@@ -2839,8 +2882,24 @@ function bindEvents() {
     }
   }));
   document.getElementById('logSearch')?.addEventListener('input', renderActivityLogs);
+  document.getElementById('dailyProfitGrid')?.addEventListener('click', event => {
+    const card = event.target.closest('.daily-profit-card[data-day-key]');
+    if (card) handleDailyProfitCardSelect(card);
+  });
+  document.getElementById('dailyProfitGrid')?.addEventListener('keydown', event => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    const card = event.target.closest('.daily-profit-card[data-day-key]');
+    if (!card) return;
+    event.preventDefault();
+    handleDailyProfitCardSelect(card);
+  });
   document.querySelectorAll('.range-filter-button').forEach(button => {
     button.addEventListener('click', () => handleTimeRangeChange(button.dataset.range));
+  });
+  window.addEventListener('resize', () => {
+    if (document.getElementById('tab-performance')?.classList.contains('active')) {
+      renderLineChart();
+    }
   });
 }
 
