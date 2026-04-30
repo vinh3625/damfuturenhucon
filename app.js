@@ -1643,6 +1643,47 @@ function formatLineAxisTick(value) {
   return `${Number.isInteger(number) ? number : number.toFixed(1)}R`;
 }
 
+function getPerformanceTone(value) {
+  const number = safeNumber(value);
+  if (number > 0) return 'positive';
+  if (number < 0) return 'negative';
+  return 'neutral';
+}
+
+function renderPerformanceLineSegment(a, b, tone) {
+  if (!a || !b) return '';
+  if (a.x === b.x && a.y === b.y) return '';
+  return `<line class="performance-line-segment ${tone}" x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}"></line>`;
+}
+
+function renderPerformanceLineSegments(points, yZero) {
+  return arr(points).slice(1).map((point, index) => {
+    const previous = points[index];
+    const a = { x: previous.x, y: previous.y, r: safeNumber(previous.r) };
+    const b = { x: point.x, y: point.y, r: safeNumber(point.r) };
+
+    if (a.r === 0 && b.r === 0) {
+      return renderPerformanceLineSegment(a, b, 'neutral');
+    }
+
+    if (a.r === 0 || b.r === 0 || Math.sign(a.r) === Math.sign(b.r)) {
+      return renderPerformanceLineSegment(a, b, getPerformanceTone((a.r + b.r) / 2));
+    }
+
+    const ratio = (0 - a.r) / (b.r - a.r);
+    const zeroPoint = {
+      x: a.x + (b.x - a.x) * ratio,
+      y: yZero,
+      r: 0
+    };
+
+    return [
+      renderPerformanceLineSegment(a, zeroPoint, getPerformanceTone(a.r)),
+      renderPerformanceLineSegment(zeroPoint, b, getPerformanceTone(b.r))
+    ].join('');
+  }).join('');
+}
+
 function renderLineChart(targetId = 'lineChart') {
   const target = document.getElementById(targetId);
   if (!target) return;
@@ -1665,6 +1706,12 @@ function renderLineChart(targetId = 'lineChart') {
 
   const pts = data.map((d,i)=>`${x(i)},${y(safeNumber(d.r))}`).join(' ');
   const area = `${x(0)},${y(0)} ${pts} ${x(data.length-1)},${y(0)}`;
+  const chartPoints = data.map((d, i) => ({
+    x: x(i),
+    y: y(safeNumber(d.r)),
+    r: safeNumber(d.r)
+  }));
+  const lineSegments = renderPerformanceLineSegments(chartPoints, y(0));
   const grid = axis.ticks
     .map(v => `<line class="chart-grid" x1="${padL}" x2="${w-padR+14}" y1="${y(v)}" y2="${y(v)}"/><text class="axis-label" x="8" y="${y(v)+4}">${formatLineAxisTick(v)}</text>`)
     .join('');
@@ -1672,8 +1719,8 @@ function renderLineChart(targetId = 'lineChart') {
   const labels = data
     .map((d, i) => labelIndexes.has(i) ? `<text class="axis-label" x="${Math.max(padL - 10, x(i)-18)}" y="${h-10}">${performancePointLabel(d)}</text>` : '')
     .join('');
-  const markers = data
-    .map((d, i) => `<circle class="performance-point" cx="${x(i)}" cy="${y(safeNumber(d.r))}" r="${data.length === 1 ? 5 : 3.5}"/>`)
+  const markers = chartPoints
+    .map((point) => `<circle class="performance-dot ${getPerformanceTone(point.r)}" cx="${point.x}" cy="${point.y}" r="${data.length === 1 ? 5 : 3.5}"/>`)
     .join('');
 
   const last = data[data.length - 1];
@@ -1682,12 +1729,12 @@ function renderLineChart(targetId = 'lineChart') {
   const lastR = safeNumber(last.r);
   const isNegative = lastR < 0;
   const isPositive = lastR > 0;
-  const areaClass = isNegative ? 'negative' : isPositive ? 'positive' : 'neutral';
+  const finalTone = getPerformanceTone(lastR);
+  const areaClass = finalTone;
   const tagFill = isNegative ? 'rgba(255,77,79,.18)' : isPositive ? 'rgba(103,240,92,.18)' : 'rgba(180,195,200,.14)';
   const tagStroke = isNegative ? 'rgba(255,77,79,.8)' : isPositive ? 'rgba(103,240,92,.8)' : 'rgba(180,195,200,.55)';
-  const tagText = isNegative ? '#ff4d4f' : isPositive ? '#67f05c' : '#cbd5d4';
 
-  target.innerHTML = `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">${grid}<polygon class="performance-area ${areaClass}" points="${area}"/><polyline class="performance-line" points="${pts}"/>${markers}<line class="chart-grid" stroke-dasharray="5 5" x1="${padL}" x2="${w-padR+14}" y1="${y(0)}" y2="${y(0)}"/>${labels}<rect x="${bx}" y="${by}" width="70" height="26" rx="9" fill="${tagFill}" stroke="${tagStroke}"/><text x="${bx+8}" y="${by+18}" fill="${tagText}" font-size="15" font-weight="800">${fmtR(last.r)}</text></svg>`;
+  target.innerHTML = `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">${grid}<polygon class="performance-area ${areaClass}" points="${area}"/>${lineSegments}${markers}<line class="chart-grid" stroke-dasharray="5 5" x1="${padL}" x2="${w-padR+14}" y1="${y(0)}" y2="${y(0)}"/>${labels}<rect x="${bx}" y="${by}" width="70" height="26" rx="9" fill="${tagFill}" stroke="${tagStroke}"/><text class="performance-label ${finalTone}" x="${bx+8}" y="${by+18}" font-size="15" font-weight="800">${fmtR(last.r)}</text></svg>`;
 }
 
 function performancePointLabel(point = {}) {

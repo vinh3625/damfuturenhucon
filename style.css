@@ -307,11 +307,27 @@ label { color: #b5c1c4; display: flex; align-items: center; gap: 8px; }
 .axis-label { fill: #9fb0b4; font-size: 12px; }
 .chart-grid { stroke: rgba(255,255,255,.08); stroke-width: 1; }
 .performance-line { fill: none; stroke: var(--green); stroke-width: 3; filter: none; }
+.performance-line-segment {
+  fill: none;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.performance-line-segment.positive { stroke: var(--green); }
+.performance-line-segment.negative { stroke: #ff505c; }
+.performance-line-segment.neutral { stroke: #ffd24a; }
 .performance-area { fill: rgba(103,240,92,.14); }
 .performance-area.positive { fill: rgba(88, 255, 96, .14); }
 .performance-area.negative { fill: rgba(255, 80, 92, .14); }
 .performance-area.neutral { fill: rgba(160, 170, 170, .08); }
 .performance-point { fill: #07100e; stroke: var(--green); stroke-width: 3; }
+.performance-dot { fill: #07100e; stroke-width: 3; }
+.performance-dot.positive { stroke: var(--green); }
+.performance-dot.negative { stroke: #ff505c; }
+.performance-dot.neutral { stroke: #ffd24a; }
+.performance-label.positive { fill: var(--green); }
+.performance-label.negative { fill: #ff505c; }
+.performance-label.neutral { fill: #ffd24a; }
 .bar-chart { height: 330px; display:flex; align-items:flex-end; justify-content: space-around; gap: 18px; padding: 34px 12px 34px; position: relative; }
 .bar-item { width: 86px; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; text-align:center; position: relative; z-index:1; }
 .bar { width: 40px; margin: 0 auto 10px; border-radius: 5px 5px 0 0; background: linear-gradient(180deg, #87ff76, #32c64e); box-shadow: 0 0 10px rgba(103,240,92,.12); }
