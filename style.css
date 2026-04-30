@@ -304,6 +304,16 @@ label { color: #b5c1c4; display: flex; align-items: center; gap: 8px; }
 .dash { width: 32px; border-top: 2px dashed #9aa7a7; display:inline-block; }
 .line-chart { height: 330px; position: relative; }
 .line-chart svg { width: 100%; height: 100%; overflow: visible; }
+.performance-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.performance-svg text {
+  letter-spacing: 0;
+  font-kerning: normal;
+  text-rendering: geometricPrecision;
+}
 .axis-label { fill: #9fb0b4; font-size: 12px; }
 .chart-grid { stroke: rgba(255,255,255,.08); stroke-width: 1; }
 .performance-line { fill: none; stroke: var(--green); stroke-width: 3; filter: none; }
@@ -501,6 +511,54 @@ label { color: #b5c1c4; display: flex; align-items: center; gap: 8px; }
 .log-table .timeline-row { grid-template-columns: 150px 150px 1fr; padding: 10px 12px; }
 .log-type { font-weight: 850; }
 .trade-journal-panel { min-width: 0; margin-bottom: 0; }
+.daily-profit-panel {
+  margin-bottom: 16px;
+}
+.daily-profit-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-start;
+  align-items: stretch;
+}
+.daily-profit-card {
+  min-width: 110px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, .08);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.daily-profit-card.positive {
+  background: rgba(28, 84, 45, .85);
+  border-color: rgba(88, 255, 96, .28);
+}
+.daily-profit-card.negative {
+  background: rgba(96, 28, 36, .85);
+  border-color: rgba(255, 95, 110, .28);
+}
+.daily-profit-card.neutral {
+  background: rgba(80, 86, 92, .75);
+  border-color: rgba(180, 190, 200, .18);
+}
+.daily-profit-date {
+  font-size: .9rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, .82);
+  line-height: 1.15;
+}
+.daily-profit-r {
+  font-size: 1.1rem;
+  font-weight: 900;
+  color: #fff;
+  line-height: 1.15;
+}
+.daily-profit-empty {
+  color: var(--muted);
+  font-size: 13px;
+  padding: 4px 0;
+}
 .journal-card-head {
   display: flex;
   align-items: center;

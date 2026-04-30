@@ -1128,10 +1128,14 @@ function ensureSystemTab() {
 function ensureTradeJournalLayout() {
   const logs = document.getElementById('tab-logs');
   if (!logs) return;
-  if (document.getElementById('tradeJournalBody') && document.getElementById('journalQuickStats')) return;
+  if (document.getElementById('tradeJournalBody') && document.getElementById('journalQuickStats') && document.getElementById('dailyProfitGrid')) return;
 
   logs.innerHTML = `
     <div class="journal-stats-grid" id="journalQuickStats"></div>
+    <section class="panel daily-profit-panel">
+      <div class="panel-title">📅 Lãi/lỗ theo ngày</div>
+      <div class="daily-profit-grid" id="dailyProfitGrid"></div>
+    </section>
     <section class="panel trade-journal-panel">
       <div class="journal-card-head">
         <div class="panel-title">Nhật ký giao dịch</div>
@@ -1734,7 +1738,7 @@ function renderLineChart(targetId = 'lineChart') {
   const tagFill = isNegative ? 'rgba(255,77,79,.18)' : isPositive ? 'rgba(103,240,92,.18)' : 'rgba(180,195,200,.14)';
   const tagStroke = isNegative ? 'rgba(255,77,79,.8)' : isPositive ? 'rgba(103,240,92,.8)' : 'rgba(180,195,200,.55)';
 
-  target.innerHTML = `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">${grid}<polygon class="performance-area ${areaClass}" points="${area}"/>${lineSegments}${markers}<line class="chart-grid" stroke-dasharray="5 5" x1="${padL}" x2="${w-padR+14}" y1="${y(0)}" y2="${y(0)}"/>${labels}<rect x="${bx}" y="${by}" width="70" height="26" rx="9" fill="${tagFill}" stroke="${tagStroke}"/><text class="performance-label ${finalTone}" x="${bx+8}" y="${by+18}" font-size="15" font-weight="800">${fmtR(last.r)}</text></svg>`;
+  target.innerHTML = `<svg class="performance-svg" viewBox="0 0 ${w} ${h}">${grid}<polygon class="performance-area ${areaClass}" points="${area}"/>${lineSegments}${markers}<line class="chart-grid" stroke-dasharray="5 5" x1="${padL}" x2="${w-padR+14}" y1="${y(0)}" y2="${y(0)}"/>${labels}<rect x="${bx}" y="${by}" width="70" height="26" rx="9" fill="${tagFill}" stroke="${tagStroke}"/><text class="performance-label ${finalTone}" x="${bx+8}" y="${by+18}" font-size="15" font-weight="800">${fmtR(last.r)}</text></svg>`;
 }
 
 function performancePointLabel(point = {}) {
@@ -2360,6 +2364,65 @@ function renderJournalQuickStats(rows) {
   ].join('');
 }
 
+function getDailyProfitTimestamp(row = {}) {
+  return parseDashboardTime(
+    firstValue(
+      row.closed_at,
+      row.closed_at_iso,
+      row.time,
+      row.opened_at,
+      row.opened_at_iso,
+      row.created_at_iso,
+      row.created_at
+    ),
+    row
+  );
+}
+
+function dailyProfitTone(value) {
+  const number = safeNumber(value);
+  if (number > 0) return 'positive';
+  if (number < 0) return 'negative';
+  return 'neutral';
+}
+
+function dailyProfitRows(rows = []) {
+  const groups = new Map();
+  arr(rows).forEach(row => {
+    const r = readTradeR(row);
+    if (r === null || !isClosedTrade(row)) return;
+    const timestamp = getDailyProfitTimestamp(row);
+    if (timestamp === null) return;
+    const key = formatDateKeyVN(timestamp, row);
+    if (!key) return;
+    if (!groups.has(key)) {
+      groups.set(key, {
+        key,
+        time: createVietnamDate(...key.split('-').map(Number)).getTime(),
+        label: formatDateVN(timestamp),
+        r: 0
+      });
+    }
+    groups.get(key).r += r;
+  });
+
+  return Array.from(groups.values())
+    .map(item => ({ ...item, r: roundR(item.r) }))
+    .sort((a, b) => b.time - a.time);
+}
+
+function renderDailyProfitCards(rows = []) {
+  const target = document.getElementById('dailyProfitGrid');
+  if (!target) return;
+  const days = dailyProfitRows(rows);
+  target.innerHTML = days.length
+    ? days.map(day => `<div class="daily-profit-card ${dailyProfitTone(day.r)}">
+      <div class="daily-profit-date">${escapeHtml(day.label)}</div>
+      <div class="daily-profit-r">${fmtR(day.r)}</div>
+    </div>`).join('')
+    : '<div class="daily-profit-empty">Chưa có dữ liệu lãi/lỗ theo ngày</div>';
+}
+
 function renderTradeJournal() {
   const target = document.getElementById('tradeJournalBody');
   if (!target) return;
@@ -2368,8 +2431,10 @@ function renderTradeJournal() {
     button.classList.toggle('active', button.dataset.journal === activeTradeJournalFilter);
   });
 
-  const rows = tradeJournalRows().filter(matchesTradeJournalFilter);
+  const allRows = tradeJournalRows();
+  const rows = allRows.filter(matchesTradeJournalFilter);
   renderJournalQuickStats(rows);
+  renderDailyProfitCards(allRows);
   target.innerHTML = rows.length
     ? rows.map(row => {
       const direction = safe(row.direction);
