@@ -184,6 +184,16 @@ h1 { margin: 0; font-size: 31px; letter-spacing: .8px; }
 .trade-sl, .badge.sl { color: var(--trade-sl); font-weight: 850; }
 .trade-tp1, .badge.tp1 { color: var(--trade-tp1); font-weight: 850; }
 .trade-tp2, .badge.tp2 { color: var(--trade-tp2); font-weight: 850; }
+.signal-table tbody td:nth-child(3),
+.trade-journal-table tbody td:nth-child(3),
+.trade-journal-table tbody td:nth-child(8),
+#pairPerfBody td:nth-child(2) {
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: 850;
+  line-height: 1.15;
+  letter-spacing: 0;
+}
 .trade-neutral { color: var(--trade-neutral); }
 .badge.wait { color: var(--yellow); }
 .badge.info { color: var(--cyan); }
