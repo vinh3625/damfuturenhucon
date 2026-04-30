@@ -1600,15 +1600,15 @@ function renderRecentResults() {
   const recentResults = recentResultsForHome();
   document.getElementById('recentResults').innerHTML = recentResults.length
     ? `<div class="recent-results-table">
-        <div class="recent-results-head"><span>Cặp / Thời gian</span><span>Hướng</span><span>Trạng thái</span><span>Thời lượng</span><span>R</span></div>
+        <div class="recent-results-head"><span>Cặp / Thời gian</span><span>Thời lượng</span><span>Hướng</span><span>Trạng thái</span><span>R</span></div>
         ${recentResults.map(r => {
       const status = getTradeOutcomeStatus(r);
       const rValue = getTradeResultR(r);
       return `<div class="recent-result-row">
         ${renderPairTimeCell(r, { iconStyle: 'width:28px;height:28px;font-size:14px;margin-right:8px' })}
+        ${renderTradeDuration(r)}
         <span><span class="badge ${clsDir(r.direction)}">${safe(r.direction)}</span></span>
         <strong><span class="badge ${statusClass(status)}">${status}</span></strong>
-        ${renderTradeDuration(r)}
         <strong class="result-r-cell ${safeNumber(rValue) < 0 ? 'num-red' : 'num-green'}">${rValue === null ? '--' : renderRValue(rValue)}</strong>
       </div>`;
     }).join('')}

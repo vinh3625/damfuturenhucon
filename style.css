@@ -246,7 +246,7 @@ tr.selected { outline: 1px solid rgba(103,240,92,.74); outline-offset: -1px; bac
 .recent-results-head,
 .recent-result-row {
   display: grid;
-  grid-template-columns: minmax(210px, 1.45fr) 86px minmax(112px, .7fr) minmax(92px, .6fr) 74px;
+  grid-template-columns: minmax(210px, 2.65fr) minmax(92px, 1fr) minmax(86px, 1fr) minmax(104px, 1fr) minmax(72px, 1fr);
   gap: 10px;
   align-items: center;
   min-width: 0;
