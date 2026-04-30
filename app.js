@@ -93,54 +93,54 @@ const fmtR = (value) => {
   const number = safeNumber(value);
   return `${number > 0 ? '+' : ''}${number.toFixed(Number.isInteger(number) ? 0 : 1)}R`;
 };
-
 function getRTone(value) {
-  const n = Number(value);
-  if (!Number.isFinite(n)) return 'neutral';
-  if (n > 0) return 'positive';
-  if (n < 0) return 'negative';
+  const number = Number(value);
+  if (!Number.isFinite(number)) return 'neutral';
+  if (number > 0) return 'positive';
+  if (number < 0) return 'negative';
   return 'neutral';
 }
-
 function formatRNumber(value, digits = 1) {
-  const n = Number(value);
-  if (!Number.isFinite(n)) return '0';
-  if (Math.abs(n) < 0.000001) return '0';
-  const abs = Math.abs(n);
-  const fixed = Number.isInteger(abs) ? String(abs) : abs.toFixed(digits).replace(/\.0$/, '');
-  return `${n > 0 ? '+' : '-'}${fixed}`;
+  const number = Number(value);
+  if (!Number.isFinite(number) || Math.abs(number) < 0.000001) return '0';
+  const abs = Math.abs(number);
+  const formatted = Number.isInteger(abs)
+    ? String(abs)
+    : abs.toFixed(digits).replace(/\.0$/, '');
+  return `${number > 0 ? '+' : '-'}${formatted}`;
 }
-
+function renderRParts(numberText, numericValue, options = {}) {
+  const tone = getRTone(numericValue);
+  const onSolid = options.onSolid ? ' on-solid' : '';
+  const customClass = options.className || options.extraClass || '';
+  const extraClass = customClass ? ` ${escapeHtml(customClass)}` : '';
+  return `<span class="r-display ${tone}${onSolid}${extraClass}"><span class="r-value">${escapeHtml(numberText)}</span><span class="r-unit">R</span></span>`;
+}
 function renderRValue(value, options = {}) {
-  const digits = options.digits ?? 1;
-  const extraClass = options.extraClass ?? '';
-  const n = Number(value);
-  const tone = getRTone(n);
-  const num = formatRNumber(n, digits);
-  const cls = ['r-display', tone, extraClass].filter(Boolean).join(' ');
-  return `<span class="${cls}"><span class="r-value">${num}</span><span class="r-unit">R</span></span>`;
+  const number = Number(value);
+  return renderRParts(formatRNumber(number, options.digits ?? 1), number, options);
 }
-
-function renderRText(text) {
-  const raw = String(text ?? '').trim();
+function renderRText(text, options = {}) {
+  const raw = safeStatus(text).trim();
   const match = raw.match(/^([+-]?\d+(?:\.\d+)?)R$/i);
-  if (!match) return escapeHtml(raw);
-  return renderRValue(Number(match[1]));
+  if (!match) return escapeHtml(raw || '--');
+  return renderRParts(match[1], Number(match[1]), options);
 }
-
-function renderTextWithRUnits(text) {
-  const raw = String(text ?? '');
-  return escapeHtml(raw).replace(/([+-]?\d+(?:\.\d+)?)R\b/g, (m, num) => {
-    return renderRValue(Number(num));
-  });
+function renderTextWithRUnits(text, options = {}) {
+  const escaped = escapeHtml(text);
+  return escaped.replace(/([+-]?\d+(?:\.\d+)?)R\b/gi, (_match, numberText) => (
+    renderRParts(numberText, Number(numberText), options)
+  ));
 }
-
-function renderSvgRValue(value, digits = 1) {
-  const n = Number(value);
-  const num = formatRNumber(n, digits);
-  return `<tspan class="svg-r-value">${num}</tspan><tspan class="svg-r-unit">R</tspan>`;
+function renderSvgRText(text) {
+  const raw = safeStatus(text).trim();
+  const match = raw.match(/^([+-]?\d+(?:\.\d+)?)R$/i);
+  if (!match) return escapeHtml(raw || '--');
+  return `<tspan class="svg-r-value">${escapeHtml(match[1])}</tspan><tspan class="svg-r-unit">R</tspan>`;
 }
-
+function renderSvgRValue(value, options = {}) {
+  return renderSvgRText(`${formatRNumber(value, options.digits ?? 1)}R`);
+}
 const clsDir = (d) => safeStatus(d) === 'LONG' ? 'long' : 'short';
 const iconFor = (symbol = '') => coinIconMap[safeStatus(symbol).replace('USDT', '')] || '◎';
 const metricChanged = (...keys) => keys.some(key => changedMetrics.has(key));
@@ -226,7 +226,7 @@ function formatRiskReward(signal = {}) {
     const rr = direction === 'LONG'
       ? Math.abs(target - entry) / risk
       : Math.abs(entry - target) / risk;
-    if (Number.isFinite(rr)) parts.push(`${label} ${renderRValue(rr)}`);
+    if (Number.isFinite(rr)) parts.push(`${label} ${rr.toFixed(1)}R`);
   });
 
   return parts.length ? parts.join(' · ') : fallbackText || '--';
@@ -311,7 +311,7 @@ function formatResultDisplay(row = {}, { includePrice = false, includeR = false,
   const price = includePrice ? cleanPrice(closePriceValue(row)) : null;
   if (price !== null) text += ` @ ${formatMaybePrice(price)}`;
   const rValue = readTradeR(row);
-  if (includeR && rValue !== null) text += ` (${renderRValue(rValue)})`;
+  if (includeR && rValue !== null) text += ` (${fmtR(rValue)})`;
   return text;
 }
 
@@ -1117,7 +1117,7 @@ function renderActiveSignalBanner() {
       ${activeBannerMetric('SL', formatMaybePrice(trade.sl), 'num-red')}
       ${activeBannerMetric('TP1', formatMaybePrice(trade.tp1), 'num-cyan')}
       ${activeBannerMetric('TP2', formatMaybePrice(trade.tp2), 'num-green')}
-      ${activeBannerMetric('R:R', formatRiskReward(trade), 'num-cyan')}
+      ${activeBannerMetric('R:R', renderTextWithRUnits(formatRiskReward(trade)), 'num-cyan')}
       ${activeBannerMetric('Độ tự tin', safe(trade.confidence), 'num-green')}
       ${activeBannerMetric('Trạng thái', safe(trade.status, 'Đang chạy'), 'num-green')}
     </div>`;
@@ -1238,7 +1238,7 @@ function renderHome() {
     </div>
     <div class="latest-extra">
       ${field('Trạng thái', `<span class="badge info ${metricChanged('latest_signal.status') ? 'value-updated' : ''}">${latestStatus}</span>`)}
-      ${field('R:R', formatRiskReward(l), 'num-cyan')}
+      ${field('R:R', renderTextWithRUnits(formatRiskReward(l)), 'num-cyan')}
       ${field('Độ tự tin', l.confidence, 'num-green')}
       ${field('Thời gian', formatItemDateTimeVN(l))}
     </div>
@@ -1413,8 +1413,8 @@ function renderRecentResults() {
         <span class="timeline-time">${formatSystemLogTime(r)}</span>
         <strong>${renderSymbolWithIcon(r.symbol, 'width:28px;height:28px;font-size:14px;margin-right:8px')}</strong>
         <span><span class="badge ${clsDir(r.direction)}">${safe(r.direction)}</span></span>
-        <strong class="${outcome === 'SL' ? 'num-red' : outcome === 'Thoát sớm' ? 'num-cyan' : 'num-green'}">${safe(result)}</strong>
-        <span>${rValue === null ? '--' : renderRValue(rValue)}</span>
+        <strong class="${outcome === 'SL' ? 'num-red' : outcome === 'Thoát sớm' ? 'num-cyan' : 'num-green'}">${renderTextWithRUnits(result)}</strong>
+        <strong class="${safeNumber(rValue) < 0 ? 'num-red' : 'num-green'}">${rValue === null ? '--' : renderRValue(rValue)}</strong>
       </div>`;
     }).join('')}
       </div>`
@@ -1573,7 +1573,7 @@ function renderSignalDetail(sig = {}) {
 
   document.getElementById('signalDetail').innerHTML = `<div class="panel-title">◎ Chi tiết tín hiệu</div>
     <div class="signal-symbol" style="margin-bottom:16px"><span class="coin-icon">${iconFor(symbol)}</span><span class="big-symbol">${renderSymbol(symbol)}</span><span class="badge ${clsDir(direction)}">${direction}</span></div>
-    ${detailRow('R:R', formatRiskReward(sig), 'num-cyan')}${detailRow('Khung thời gian', safe(sig.timeframe))}${detailRow('Entry', formatMaybePrice(sig.entry))}${detailRow('Stop Loss (SL)', formatMaybePrice(sig.sl), 'num-red')}${detailRow('Take Profit 1 (TP1)', formatMaybePrice(sig.tp1), 'num-green')}${detailRow('Take Profit 2 (TP2)', formatMaybePrice(sig.tp2), 'num-green')}${detailRow('Độ tự tin', safe(sig.confidence), 'num-green')}${detailRow('Trạng thái', `<span class="badge ${statusClass(status)}">${status}</span>`)}${detailRow('Thời gian', timeText)}
+    ${detailRow('R:R', renderTextWithRUnits(formatRiskReward(sig)), 'num-cyan')}${detailRow('Khung thời gian', safe(sig.timeframe))}${detailRow('Entry', formatMaybePrice(sig.entry))}${detailRow('Stop Loss (SL)', formatMaybePrice(sig.sl), 'num-red')}${detailRow('Take Profit 1 (TP1)', formatMaybePrice(sig.tp1), 'num-green')}${detailRow('Take Profit 2 (TP2)', formatMaybePrice(sig.tp2), 'num-green')}${detailRow('Độ tự tin', safe(sig.confidence), 'num-green')}${detailRow('Trạng thái', `<span class="badge ${statusClass(status)}">${status}</span>`)}${detailRow('Thời gian', timeText)}
     <div class="note-box"><strong class="num-green">ⓘ Ghi chú</strong><br>${sanitizePublicText(sig.note) === '--' ? 'Không có ghi chú' : sanitizePublicText(sig.note)}</div>`;
 }
 
@@ -1595,9 +1595,9 @@ function renderPerformance() {
   renderPerformanceDistribution();
   const pairPerformance = arr(dashboardData.pair_performance);
   document.getElementById('pairPerfBody').innerHTML = pairPerformance.length
-    ? pairPerformance.map(p => `<tr><td><strong>${renderSymbolWithIcon(p.symbol, 'width:28px;height:28px;font-size:14px;margin-right:8px')}</strong></td><td>${safeNumber(p.trades)}</td><td class="num-green">${safeNumber(p.win_rate)}%</td><td>${renderRValue(p.r)}</td></tr>`).join('')
+    ? pairPerformance.map(p => `<tr><td><strong>${renderSymbolWithIcon(p.symbol, 'width:28px;height:28px;font-size:14px;margin-right:8px')}</strong></td><td>${safeNumber(p.trades)}</td><td class="num-green">${safeNumber(p.win_rate)}%</td><td class="${safeNumber(p.r) < 0 ? 'num-red' : 'num-green'}">${renderRValue(p.r)}</td></tr>`).join('')
     : '<tr><td colspan="4" class="empty-state">Chưa có hiệu suất theo cặp</td></tr>';
-  const best = pairPerformance.slice().sort((a,b)=>safeNumber(b.r)-safeNumber(a.r))[0] || {};
+  const best = pairPerformance.slice().sort((a, b) => safeNumber(b.r) - safeNumber(a.r))[0] || {};
   document.getElementById('insights').innerHTML = `<div class="panel-title">🎯 Insights nhanh</div>
     ${insight('🏆', 'Cặp tốt nhất', renderSymbol(safe(best.symbol, 'ETHUSDT')), 'Tổng R', renderRValue(best.r))}
     ${insight('🕘', 'Khung hiệu quả', 'M5', 'Win rate', '61.3%')}
@@ -1642,7 +1642,7 @@ function renderPerformanceOverviewStats() {
   const target = document.getElementById('performanceOverviewStats');
   if (!target) return;
   target.innerHTML = [
-    homeMetric('Tổng PnL', renderRValue(s.total_r), ''),
+    homeMetric('Tổng PnL', renderRValue(s.total_r), safeNumber(s.total_r) < 0 ? 'num-red' : 'num-green'),
     homeMetric('Win rate', `${safeNumber(s.win_rate)}%`, 'num-green'),
     homeMetric('Số lệnh', safeNumber(s.total_signals), 'num-cyan')
   ].join('');
@@ -1763,8 +1763,8 @@ function renderLineChart(targetId = 'lineChart') {
   const x = i => padL + (i / Math.max(1, data.length - 1)) * (w - padL - padR);
   const y = v => h - padB - ((v - min) / Math.max(1, max - min)) * (h - padT - padB);
 
-  const pts = data.map((d,i)=>`${x(i)},${y(safeNumber(d.r))}`).join(' ');
-  const area = `${x(0)},${y(0)} ${pts} ${x(data.length-1)},${y(0)}`;
+  const pts = data.map((d, i) => `${x(i)},${y(safeNumber(d.r))}`).join(' ');
+  const area = `${x(0)},${y(0)} ${pts} ${x(data.length - 1)},${y(0)}`;
   const chartPoints = data.map((d, i) => ({
     x: x(i),
     y: y(safeNumber(d.r)),
@@ -1772,11 +1772,11 @@ function renderLineChart(targetId = 'lineChart') {
   }));
   const lineSegments = renderPerformanceLineSegments(chartPoints, y(0));
   const grid = axis.ticks
-    .map(v => `<line class="chart-grid" x1="${padL}" x2="${w-padR+14}" y1="${y(v)}" y2="${y(v)}"/><text class="axis-label" x="8" y="${y(v)+4}">${renderSvgRValue(v)}</text>`)
+    .map(v => `<line class="chart-grid" x1="${padL}" x2="${w - padR + 14}" y1="${y(v)}" y2="${y(v)}"/><text class="axis-label" x="8" y="${y(v) + 4}">${renderSvgRText(formatLineAxisTick(v))}</text>`)
     .join('');
   const labelIndexes = new Set([0, 3, 6, 9, 12, data.length - 1]);
   const labels = data
-    .map((d, i) => labelIndexes.has(i) ? `<text class="axis-label" x="${Math.max(padL - 10, x(i)-18)}" y="${h-10}">${performancePointLabel(d)}</text>` : '')
+    .map((d, i) => labelIndexes.has(i) ? `<text class="axis-label" x="${Math.max(padL - 10, x(i) - 18)}" y="${h - 10}">${performancePointLabel(d)}</text>` : '')
     .join('');
   const markers = chartPoints
     .map((point) => `<circle class="performance-dot ${getPerformanceTone(point.r)}" cx="${point.x}" cy="${point.y}" r="${data.length === 1 ? 5 : 3.5}"/>`)
@@ -1793,7 +1793,7 @@ function renderLineChart(targetId = 'lineChart') {
   const tagFill = isNegative ? 'rgba(255,77,79,.18)' : isPositive ? 'rgba(103,240,92,.18)' : 'rgba(180,195,200,.14)';
   const tagStroke = isNegative ? 'rgba(255,77,79,.8)' : isPositive ? 'rgba(103,240,92,.8)' : 'rgba(180,195,200,.55)';
 
-  target.innerHTML = `<svg class="performance-svg" viewBox="0 0 ${w} ${h}" width="100%" height="100%">${grid}<polygon class="performance-area ${areaClass}" points="${area}"/>${lineSegments}${markers}<line class="chart-grid" stroke-dasharray="5 5" x1="${padL}" x2="${w-padR+14}" y1="${y(0)}" y2="${y(0)}"/>${labels}<rect x="${bx}" y="${by}" width="78" height="26" rx="9" fill="${tagFill}" stroke="${tagStroke}"/><text class="performance-label ${finalTone}" x="${bx+8}" y="${by+18}" font-size="15">${renderSvgRValue(last.r)}</text></svg>`;
+  target.innerHTML = `<svg class="performance-svg" viewBox="0 0 ${w} ${h}" width="100%" height="100%">${grid}<polygon class="performance-area ${areaClass}" points="${area}"/>${lineSegments}${markers}<line class="chart-grid" stroke-dasharray="5 5" x1="${padL}" x2="${w - padR + 14}" y1="${y(0)}" y2="${y(0)}"/>${labels}<rect x="${bx}" y="${by}" width="70" height="26" rx="9" fill="${tagFill}" stroke="${tagStroke}"/><text class="performance-label ${finalTone}" x="${bx + 8}" y="${by + 18}" font-size="15" font-weight="800">${renderSvgRValue(last.r)}</text></svg>`;
 }
 
 function performancePointLabel(point = {}) {
@@ -2014,7 +2014,7 @@ function renderRangeResultAxisChart(buckets, range = selectedTimeRange) {
     const y = bottomY - (safeNumber(tick) / axisMax) * plotHeight;
     return `<g class="range-axis-tick">
       <line class="range-axis-grid" x1="${margin.left}" y1="${y}" x2="${width - margin.right}" y2="${y}"></line>
-      <text class="range-axis-y-text" x="${margin.left - 12}" y="${y + 4}" text-anchor="end">${renderSvgRValue(tick)}</text>
+      <text class="range-axis-y-text" x="${margin.left - 12}" y="${y + 4}" text-anchor="end">${renderSvgRText(formatAxisTickR(tick, axisMax))}</text>
     </g>`;
   }).join('');
 
@@ -2085,10 +2085,10 @@ function renderRangeResultAxisCard(buckets, range = selectedTimeRange) {
       <div class="range-axis-dom-labels" aria-hidden="true"><span>Độ lớn R</span><span>Thời gian</span></div>
       <div class="range-result-plot">${renderRangeResultAxisChart(buckets, range)}</div>
       <div class="range-bars-summary">
-        <div><span>Tổng R</span><strong>${renderRValue(totalR)}</strong></div>
+        <div><span>Tổng R</span><strong class="${totalR < 0 ? 'num-red' : totalR > 0 ? 'num-green' : ''}">${renderRValue(totalR)}</strong></div>
         <div><span>Số lệnh</span><strong>${safeNumber(totalTrades)}</strong></div>
-        <div><span>Tốt nhất</span><strong>${escapeHtml(best.label || '--')} · ${renderRValue(best.r)}</strong></div>
-        <div><span>Xấu nhất</span><strong>${escapeHtml(worst.label || '--')} · ${renderRValue(worst.r)}</strong></div>
+        <div><span>Tốt nhất</span><strong class="${safeNumber(best.r) > 0 ? 'num-green' : ''}">${escapeHtml(best.label || '--')} · ${renderRValue(best.r)}</strong></div>
+        <div><span>Xấu nhất</span><strong class="${safeNumber(worst.r) < 0 ? 'num-red' : ''}">${escapeHtml(worst.label || '--')} · ${renderRValue(worst.r)}</strong></div>
       </div>
     </div>`;
 }
@@ -2097,7 +2097,7 @@ function renderDistribution(targetId = 'distribution') {
   const target = document.getElementById(targetId);
   if (!target) return;
   const total = arr(dashboardData.result_distribution).reduce((sum, item) => sum + safeNumber(item.count), 0);
-  target.innerHTML = `<div class="donut"><div class="donut-inner"><strong>${total}</strong><br><span>Lệnh đóng</span></div></div><div class="legend-list">${arr(dashboardData.result_distribution).map((x,i)=>`<div><span class="dot" style="background:${['var(--green)','var(--cyan)','var(--red)','var(--yellow)'][i]}"></span> ${safe(x.label)} <strong style="float:right">${safeNumber(x.count)} (${safeNumber(x.percent)}%)</strong></div>`).join('')}<small>Lệnh đóng: ${total}</small></div>`;
+  target.innerHTML = `<div class="donut"><div class="donut-inner"><strong>${total}</strong><br><span>Lệnh đóng</span></div></div><div class="legend-list">${arr(dashboardData.result_distribution).map((x, i) => `<div><span class="dot" style="background:${['var(--green)', 'var(--cyan)', 'var(--red)', 'var(--yellow)'][i]}"></span> ${safe(x.label)} <strong style="float:right">${safeNumber(x.count)} (${safeNumber(x.percent)}%)</strong></div>`).join('')}<small>Lệnh đóng: ${total}</small></div>`;
 }
 
 function renderLogs() {
@@ -2106,7 +2106,7 @@ function renderLogs() {
   hideLogSystemSummary();
 }
 
-function eventCard(icon, label, value, red=false) { return `<div class="event-card"><span class="kpi-icon" style="width:40px;height:40px;font-size:18px">${icon}</span><span>${label}</span><strong class="${red?'num-red':'num-green'}" style="font-size:24px">${safeNumber(value)}</strong></div>`; }
+function eventCard(icon, label, value, red = false) { return `<div class="event-card"><span class="kpi-icon" style="width:40px;height:40px;font-size:18px">${icon}</span><span>${label}</span><strong class="${red ? 'num-red' : 'num-green'}" style="font-size:24px">${safeNumber(value)}</strong></div>`; }
 
 function firstValue(...values) {
   return values.find(value => value !== undefined && value !== null && value !== '');
@@ -2417,7 +2417,7 @@ function renderJournalQuickStats(rows) {
     statCard('SL', rows.filter(row => /\bSL\b|STOP LOSS/.test(journalResultText(row))).length, 'num-red', 'red'),
     statCard('TP1', rows.filter(row => /\bTP1\b/.test(journalResultText(row))).length, 'num-cyan', 'cyan'),
     statCard('TP2', rows.filter(row => /\bTP2\b/.test(journalResultText(row))).length, 'num-green', 'green'),
-    statCard('R:R', renderRValue(totalR), '', totalTone)
+    statCard('R:R', renderRText(formatJournalR(totalR) || '0R'), totalR < 0 ? 'num-red' : totalR > 0 ? 'num-green' : '', totalTone)
   ].join('');
 }
 
@@ -2441,14 +2441,6 @@ function dailyProfitTone(value) {
   if (number > 0) return 'positive';
   if (number < 0) return 'negative';
   return 'neutral';
-}
-
-function dailyProfitRParts(value) {
-  const text = fmtR(value);
-  return {
-    value: text.replace(/R$/, ''),
-    unit: 'R'
-  };
 }
 
 function dailyProfitRows(rows = []) {
@@ -2489,7 +2481,7 @@ function renderDailyProfitCards(rows = []) {
       const active = selectedDailyProfitDayKey === day.key ? ' active' : '';
       return `<div class="daily-profit-card ${dailyProfitTone(day.r)}${active}" data-day-key="${escapeHtml(day.key)}" role="button" tabindex="0" aria-pressed="${selectedDailyProfitDayKey === day.key ? 'true' : 'false'}">
       <div class="daily-profit-date">${escapeHtml(day.label)}</div>
-      <div class="daily-profit-r">${renderRValue(day.r, { extraClass: 'on-solid' })}</div>
+      <div class="daily-profit-r">${renderRValue(day.r, { onSolid: true })}</div>
     </div>`;
     }).join('')
     : '<div class="daily-profit-empty">Chưa có dữ liệu lãi/lỗ theo ngày</div>';
@@ -2534,7 +2526,7 @@ function renderTradeJournal() {
         <td class="num-green">${formatTradeNumber(row.tp2)}</td>
         <td>${formatPositionValue(row.position_value)}</td>
         <td><span class="badge ${statusClass(row.status)}">${safe(row.status)}</span></td>
-        <td><strong class="${journalResultClass(result)}">${result}</strong></td>
+        <td><strong class="${journalResultClass(result)}">${renderTextWithRUnits(result)}</strong></td>
       </tr>`;
     }).join('')
     : '<tr><td colspan="11" class="empty-state">Chưa có nhật ký giao dịch.</td></tr>';
@@ -2552,7 +2544,7 @@ function renderSystemSummary() {
     ${systemRow('Risk lock hôm nay', sys.risk_lock ? 'Bật' : 'Tắt', sys.risk_lock)}
     ${systemRow('Trạng thái dữ liệu', sys.data_status, false)}${systemRow('Lỗi gần nhất', sys.last_error, false)}${systemRow('Quét M5 cuối', sys.last_m5_scan, false, 'num-cyan')}${systemRow('Vị thế active', activePositionsCount(), false)}`;
 }
-function systemRow(label, value, danger=false, cls='num-green') { return `<div class="system-row"><span>${label}</span><strong class="${danger?'num-red':cls}">${safe(value)}</strong></div>`; }
+function systemRow(label, value, danger = false, cls = 'num-green') { return `<div class="system-row"><span>${label}</span><strong class="${danger ? 'num-red' : cls}">${safe(value)}</strong></div>`; }
 
 function activePositionsCount() {
   if (Array.isArray(dashboardData?.active_trades)) return dashboardData.active_trades.length;
@@ -2880,7 +2872,7 @@ function logRow(log) {
 function dotClass(type) { return type === 'Cảnh báo' ? 'yellow' : type === 'Thoát lệnh' ? 'red' : type === 'Vào lệnh' ? 'green' : ''; }
 function typeClass(type) { return type === 'Cảnh báo' ? 'num-red' : type === 'Thoát lệnh' ? 'num-red' : type === 'Vào lệnh' ? 'num-green' : type === 'Tín hiệu' ? 'num-cyan' : 'num-cyan'; }
 function highlightMessage(message) {
-  return sanitizePublicText(message)
+  return renderTextWithRUnits(sanitizePublicText(message))
     .replace(/\b([A-Z0-9]{2,20}USDT)\b/g, symbol => renderSymbol(symbol))
     .replace(/\bLONG\b/g, '<strong class="pos">LONG</strong>')
     .replace(/\bSHORT\b/g, '<strong class="neg">SHORT</strong>')
@@ -2913,7 +2905,7 @@ function bindEvents() {
     selectedSignalIndex = 0;
     renderSignalTable();
   }));
-  ['pairFilter','tfFilter','dirFilter'].forEach(id => document.getElementById(id)?.addEventListener('change', () => { selectedSignalIndex = 0; renderSignalTable(); }));
+  ['pairFilter', 'tfFilter', 'dirFilter'].forEach(id => document.getElementById(id)?.addEventListener('change', () => { selectedSignalIndex = 0; renderSignalTable(); }));
   document.getElementById('resetFilters')?.addEventListener('click', () => {
     activeSignalFilter = 'all'; selectedSignalIndex = 0;
     document.querySelectorAll('.filter').forEach(b => b.classList.toggle('active', b.dataset.filter === 'all'));
