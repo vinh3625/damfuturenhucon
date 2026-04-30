@@ -647,28 +647,40 @@ label { color: #b5c1c4; display: flex; align-items: center; gap: 8px; }
   position: relative;
   overflow: hidden;
   min-width: 0;
-  padding: 14px 16px;
-  border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, .10);
-  background: rgba(255, 255, 255, .045);
+  padding: 13px 15px;
+  border-radius: 12px;
+  border: 1px solid rgba(150, 232, 255, .22);
+  background: linear-gradient(180deg, var(--panel) 0%, rgba(5, 18, 24, .82) 100%);
   box-shadow:
-    0 14px 30px rgba(0, 0, 0, .34),
-    inset 0 1px 0 rgba(255, 255, 255, .05);
+    0 18px 40px rgba(0, 0, 0, .48),
+    0 0 14px rgba(90, 255, 105, .06),
+    inset 0 1px 0 rgba(255, 255, 255, .07);
   transform-origin: center;
   transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease, background .18s ease, filter .18s ease;
 }
 .journal-stat-card::before {
   content: "";
   position: absolute;
-  inset: -45%;
-  opacity: .22;
+  inset: -55%;
+  opacity: .30;
   pointer-events: none;
-  filter: blur(18px);
+  filter: blur(20px);
   transform: rotate(12deg);
+}
+.journal-stat-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(103, 240, 92, .045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(55, 200, 255, .035) 1px, transparent 1px);
+  background-size: 24px 24px;
+  opacity: .24;
+  pointer-events: none;
 }
 .journal-stat-card span {
   position: relative;
-  z-index: 1;
+  z-index: 2;
   display: block;
   color: rgba(232, 246, 242, .72);
   font-size: 12px;
@@ -679,9 +691,9 @@ label { color: #b5c1c4; display: flex; align-items: center; gap: 8px; }
 }
 .journal-stat-card strong {
   position: relative;
-  z-index: 1;
+  z-index: 2;
   display: block;
-  margin-top: 7px;
+  margin-top: 8px;
   font-size: 24px;
   line-height: 1;
   font-weight: 950;
@@ -689,76 +701,76 @@ label { color: #b5c1c4; display: flex; align-items: center; gap: 8px; }
 }
 .journal-stat-green {
   background:
-    radial-gradient(circle at 20% 0%, rgba(88, 255, 96, .22), transparent 42%),
-    linear-gradient(180deg, rgba(21, 80, 36, .72), rgba(8, 24, 17, .86));
-  border-color: rgba(88, 255, 96, .30);
+    radial-gradient(circle at 18% 0%, rgba(103, 240, 92, .28), transparent 45%),
+    linear-gradient(180deg, rgba(6, 30, 15, .96), rgba(4, 14, 14, .90));
+  border-color: rgba(103, 240, 92, .50);
   box-shadow:
-    0 14px 34px rgba(0, 0, 0, .36),
-    0 0 22px rgba(88, 255, 96, .10),
-    inset 0 1px 0 rgba(255, 255, 255, .06);
+    0 18px 40px rgba(0, 0, 0, .50),
+    0 0 22px rgba(103, 240, 92, .15),
+    inset 0 1px 0 rgba(255, 255, 255, .08);
 }
-.journal-stat-green::before { background: rgba(88, 255, 96, .28); }
+.journal-stat-green::before { background: rgba(103, 240, 92, .34); }
 .journal-stat-red {
   background:
-    radial-gradient(circle at 20% 0%, rgba(255, 80, 92, .24), transparent 42%),
-    linear-gradient(180deg, rgba(92, 26, 36, .72), rgba(30, 9, 14, .88));
-  border-color: rgba(255, 95, 110, .34);
+    radial-gradient(circle at 18% 0%, rgba(255, 80, 92, .30), transparent 45%),
+    linear-gradient(180deg, rgba(56, 12, 19, .96), rgba(19, 7, 12, .91));
+  border-color: rgba(255, 95, 110, .52);
   box-shadow:
-    0 14px 34px rgba(0, 0, 0, .36),
-    0 0 22px rgba(255, 80, 92, .11),
-    inset 0 1px 0 rgba(255, 255, 255, .06);
+    0 18px 40px rgba(0, 0, 0, .50),
+    0 0 22px rgba(255, 80, 92, .16),
+    inset 0 1px 0 rgba(255, 255, 255, .08);
 }
-.journal-stat-red::before { background: rgba(255, 80, 92, .30); }
+.journal-stat-red::before { background: rgba(255, 80, 92, .36); }
 .journal-stat-cyan {
   background:
-    radial-gradient(circle at 20% 0%, rgba(57, 205, 255, .23), transparent 42%),
-    linear-gradient(180deg, rgba(18, 66, 82, .70), rgba(7, 24, 31, .88));
-  border-color: rgba(57, 205, 255, .32);
+    radial-gradient(circle at 18% 0%, rgba(55, 200, 255, .29), transparent 45%),
+    linear-gradient(180deg, rgba(7, 35, 48, .96), rgba(5, 18, 24, .91));
+  border-color: rgba(55, 200, 255, .50);
   box-shadow:
-    0 14px 34px rgba(0, 0, 0, .36),
-    0 0 22px rgba(57, 205, 255, .10),
-    inset 0 1px 0 rgba(255, 255, 255, .06);
+    0 18px 40px rgba(0, 0, 0, .50),
+    0 0 22px rgba(55, 200, 255, .15),
+    inset 0 1px 0 rgba(255, 255, 255, .08);
 }
-.journal-stat-cyan::before { background: rgba(57, 205, 255, .28); }
+.journal-stat-cyan::before { background: rgba(55, 200, 255, .34); }
 .journal-stat-neutral {
   background:
-    radial-gradient(circle at 20% 0%, rgba(180, 190, 200, .18), transparent 42%),
-    linear-gradient(180deg, rgba(40, 48, 52, .64), rgba(12, 16, 18, .88));
-  border-color: rgba(180, 190, 200, .20);
+    radial-gradient(circle at 18% 0%, rgba(150, 232, 255, .20), transparent 45%),
+    linear-gradient(180deg, rgba(8, 26, 28, .96), rgba(5, 13, 16, .91));
+  border-color: rgba(150, 232, 255, .32);
   box-shadow:
-    0 14px 34px rgba(0, 0, 0, .36),
-    0 0 18px rgba(180, 190, 200, .07),
-    inset 0 1px 0 rgba(255, 255, 255, .05);
+    0 18px 40px rgba(0, 0, 0, .50),
+    0 0 18px rgba(55, 200, 255, .10),
+    inset 0 1px 0 rgba(255, 255, 255, .07);
 }
-.journal-stat-neutral::before { background: rgba(180, 190, 200, .18); }
+.journal-stat-neutral::before { background: rgba(103, 240, 92, .22); }
 .journal-stat-card:hover {
   z-index: 12;
   transform: translateY(-3px);
   filter: brightness(1.08);
 }
 .journal-stat-green:hover {
-  border-color: rgba(88, 255, 96, .58);
+  border-color: rgba(103, 240, 92, .72);
   box-shadow:
-    0 18px 42px rgba(0, 0, 0, .42),
-    0 0 34px rgba(88, 255, 96, .20);
+    0 22px 52px rgba(0, 0, 0, .58),
+    0 0 34px rgba(103, 240, 92, .25);
 }
 .journal-stat-red:hover {
-  border-color: rgba(255, 95, 110, .62);
+  border-color: rgba(255, 95, 110, .74);
   box-shadow:
-    0 18px 42px rgba(0, 0, 0, .42),
-    0 0 34px rgba(255, 80, 92, .22);
+    0 22px 52px rgba(0, 0, 0, .58),
+    0 0 34px rgba(255, 80, 92, .27);
 }
 .journal-stat-cyan:hover {
-  border-color: rgba(57, 205, 255, .58);
+  border-color: rgba(55, 200, 255, .72);
   box-shadow:
-    0 18px 42px rgba(0, 0, 0, .42),
-    0 0 34px rgba(57, 205, 255, .20);
+    0 22px 52px rgba(0, 0, 0, .58),
+    0 0 34px rgba(55, 200, 255, .25);
 }
 .journal-stat-neutral:hover {
-  border-color: rgba(180, 190, 200, .42);
+  border-color: rgba(150, 232, 255, .52);
   box-shadow:
-    0 18px 42px rgba(0, 0, 0, .42),
-    0 0 28px rgba(180, 190, 200, .15);
+    0 22px 52px rgba(0, 0, 0, .58),
+    0 0 30px rgba(55, 200, 255, .18);
 }
 .system-status-card {
   position: relative;
