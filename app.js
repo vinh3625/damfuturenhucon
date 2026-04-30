@@ -84,6 +84,44 @@ function renderSymbolWithIcon(symbol, iconStyle = 'width:30px;height:30px;font-s
   return `<span class="coin-icon" style="${iconStyle}">${iconFor(symbol)}</span>${renderSymbol(symbol)}`;
 }
 
+function getPairTimeText(item = {}) {
+  const fields = [
+    'closed_at',
+    'closed_at_iso',
+    'time',
+    'time_iso',
+    'opened_at',
+    'opened_at_iso',
+    'created_at_iso',
+    'created_at',
+    'timestamp',
+    'updated_at',
+    'display_time',
+    'date'
+  ];
+
+  for (const field of fields) {
+    const time = parseDashboardTime(item[field], item);
+    if (time !== null) return formatDateTimeVN(time);
+  }
+
+  return '';
+}
+
+function renderPairTimeCell(item = {}, options = {}) {
+  const symbol = safe(firstValue(item.symbol, item.coin), options.fallbackSymbol || 'ETHUSDT');
+  const iconStyle = options.iconStyle || 'width:30px;height:30px;font-size:14px';
+  const timeText = getPairTimeText(item);
+  const extraClass = options.className ? ` ${escapeHtml(options.className)}` : '';
+  return `<div class="pair-time-cell${extraClass}">
+    <span class="coin-icon pair-icon" style="${iconStyle}">${iconFor(symbol)}</span>
+    <div class="pair-stack">
+      <div class="pair-line"><strong>${renderSymbol(symbol)}</strong></div>
+      ${timeText ? `<div class="pair-time">${escapeHtml(timeText)}</div>` : ''}
+    </div>
+  </div>`;
+}
+
 const signalList = () => {
   const signals = arr(dashboardData?.signals);
   if (signals.length) return signals;
@@ -1238,7 +1276,7 @@ function ensureTradeJournalLayout() {
       </div>
       <div class="table-wrap trade-journal-wrap">
         <table class="trade-journal-table">
-          <thead><tr><th>Thời gian</th><th>Cặp</th><th>Hướng</th><th>Khung</th><th>Entry</th><th>SL</th><th>TP1</th><th>TP2</th><th>Giá trị lệnh</th><th>Trạng thái</th><th>Kết quả</th></tr></thead>
+          <thead><tr><th>Cặp / Thời gian</th><th>Hướng</th><th>Khung</th><th>Entry</th><th>SL</th><th>TP1</th><th>TP2</th><th>Giá trị lệnh</th><th>Trạng thái</th><th>Kết quả</th></tr></thead>
           <tbody id="tradeJournalBody"></tbody>
         </table>
       </div>
@@ -1438,13 +1476,12 @@ function renderRecentResults() {
   const recentResults = recentResultsForHome();
   document.getElementById('recentResults').innerHTML = recentResults.length
     ? `<div class="recent-results-table">
-        <div class="recent-results-head"><span>Thời gian</span><span>Cặp</span><span>Hướng</span><span>Trạng thái</span><span>R</span></div>
+        <div class="recent-results-head"><span>Cặp / Thời gian</span><span>Hướng</span><span>Trạng thái</span><span>R</span></div>
         ${recentResults.map(r => {
       const status = getTradeOutcomeStatus(r);
       const rValue = getTradeResultR(r);
       return `<div class="recent-result-row">
-        <span class="timeline-time">${formatSystemLogTime(r)}</span>
-        <strong>${renderSymbolWithIcon(r.symbol, 'width:28px;height:28px;font-size:14px;margin-right:8px')}</strong>
+        ${renderPairTimeCell(r, { iconStyle: 'width:28px;height:28px;font-size:14px' })}
         <span><span class="badge ${clsDir(r.direction)}">${safe(r.direction)}</span></span>
         <strong><span class="badge ${statusClass(status)}">${status}</span></strong>
         <strong class="${safeNumber(rValue) < 0 ? 'num-red' : 'num-green'}">${rValue === null ? '--' : renderRValue(rValue)}</strong>
@@ -1516,7 +1553,7 @@ function field(label, value, cls = '') {
 
 function tradeRow(t, changed = false) {
   const status = getTradeOutcomeStatus(t);
-  return `<tr class="${changed ? 'row-enter' : ''}"><td><strong>${renderSymbolWithIcon(t.symbol)}</strong></td><td class="${clsDir(t.direction)}"><strong>${safe(t.direction)}</strong></td><td>${formatMaybePrice(t.entry)}</td><td>${formatMaybePrice(t.tp1)}</td><td>${formatMaybePrice(t.tp2)}</td><td class="num-red">${formatMaybePrice(t.sl)}</td><td><span class="badge ${statusClass(status)}">${status}</span></td></tr>`;
+  return `<tr class="${changed ? 'row-enter' : ''}"><td>${renderPairTimeCell(t)}</td><td class="${clsDir(t.direction)}"><strong>${safe(t.direction)}</strong></td><td>${formatMaybePrice(t.entry)}</td><td>${formatMaybePrice(t.tp1)}</td><td>${formatMaybePrice(t.tp2)}</td><td class="num-red">${formatMaybePrice(t.sl)}</td><td><span class="badge ${statusClass(status)}">${status}</span></td></tr>`;
 }
 
 function renderSystemMini(id) {
@@ -1576,7 +1613,7 @@ function renderSignalTable() {
   document.getElementById('signalsBody').innerHTML = rows.map((sig, idx) => {
     const status = getTradeOutcomeStatus(sig);
     return `<tr data-signal-index="${idx}">
-      <td>${renderSignalSymbolTime(sig)}</td>
+      <td>${renderPairTimeCell(sig)}</td>
       <td class="${clsDir(sig.direction)}"><strong>${safe(sig.direction, 'LONG')}</strong></td>
       <td>${safe(sig.timeframe)}</td><td>${formatMaybePrice(sig.entry)}</td><td class="num-red">${formatMaybePrice(sig.sl)}</td><td class="num-green">${formatMaybePrice(sig.tp1)}</td><td class="num-green">${formatMaybePrice(sig.tp2)}</td>
       <td><span class="badge ${statusClass(status)}">${status}</span></td>
@@ -1584,14 +1621,6 @@ function renderSignalTable() {
     </tr>`;
   }).join('');
   document.getElementById('signalCountText').textContent = `Hiển thị 1 - ${rows.length} của ${signalList().length} tín hiệu`;
-}
-
-function renderSignalSymbolTime(sig = {}) {
-  const timeText = formatItemDateTimeVN(sig);
-  return `<div class="signal-symbol-time">
-    <strong>${renderSymbolWithIcon(safe(sig.symbol, 'ETHUSDT'))}</strong>
-    ${timeText === '--' ? '' : `<span class="signal-row-time">${escapeHtml(timeText)}</span>`}
-  </div>`;
 }
 
 function statusClass(status) {
@@ -2540,8 +2569,7 @@ function renderTradeJournal() {
       const highlightClass = dayKey && selectedDailyProfitDayKey === dayKey ? ' class="journal-day-highlight"' : '';
       const dayAttr = dayKey ? ` data-trade-day="${escapeHtml(dayKey)}"` : '';
       return `<tr${dayAttr}${highlightClass}>
-        <td class="journal-time">${formatSystemDateTime(row.time)}</td>
-        <td><strong>${renderSymbol(row.symbol)}</strong></td>
+        <td>${renderPairTimeCell(row)}</td>
         <td><span class="badge ${directionClass}">${direction}</span></td>
         <td>${safe(row.timeframe)}</td>
         <td>${formatTradeNumber(row.entry)}</td>
@@ -2553,7 +2581,7 @@ function renderTradeJournal() {
         <td><strong class="${journalResultClass(result)}">${result}</strong></td>
       </tr>`;
     }).join('')
-    : '<tr><td colspan="11" class="empty-state">Chưa có nhật ký giao dịch.</td></tr>';
+    : '<tr><td colspan="10" class="empty-state">Chưa có nhật ký giao dịch.</td></tr>';
 
   if (shouldScrollToSelectedDay) {
     const firstHighlighted = document.querySelector('.journal-day-highlight');
