@@ -301,6 +301,8 @@ function resultActionLabel(result) {
   if (result === 'TP1' || result === 'TP2') return `Chốt ${result}`;
   if (result === 'SL') return 'Dừng lỗ';
   if (result === 'Thoát sớm') return 'Thoát sớm';
+  if (result === 'Hòa vốn') return 'Hòa vốn';
+  if (result === 'Đóng tay') return 'Đóng tay';
   return result || 'Đóng lệnh';
 }
 
@@ -675,8 +677,7 @@ function filterHistoricalRows(rows, range = selectedTimeRange, timestampReader =
 }
 
 function isPendingHistoryRow(row = {}) {
-  const status = safeStatus(row.status).toLowerCase();
-  return status.includes('chờ') || status.includes('pending');
+  return getTradeOutcomeStatus(row) === 'Chờ xác nhận';
 }
 
 function isClosedHistoryRow(row = {}) {
@@ -688,14 +689,28 @@ function normalizeDistributionOutcome(value) {
 }
 
 function normalizeResult(row = {}) {
-  const value = typeof row === 'object'
-    ? firstValue(row.result, row.outcome, row.pnl_result, row.label, row.result_text, row.status, row.state, row.event)
-    : row;
-  const text = safeStatus(value).toUpperCase();
-  if (/\bSL\b/.test(text) || text.includes('STOP LOSS') || text.includes('LOST') || text.includes('LOSS')) return 'SL';
-  if (/\bTP1\b/.test(text) || text.includes('TAKE_PROFIT_1')) return 'TP1';
-  if (/\bTP2\b/.test(text) || text.includes('TAKE_PROFIT_2') || text.includes('WIN') || text.includes('TAKE PROFIT') || text.includes('TAKE_PROFIT')) return 'TP2';
-  if (text.includes('EARLY') || text.includes('EXIT') || text.includes('THOÁT SỚM') || text.includes('THOAT SOM') || text.includes('THOÁT')) return 'Thoát sớm';
+  const values = typeof row === 'object'
+    ? [
+      row.result,
+      row.public_result,
+      row.outcome,
+      row.pnl_result,
+      row.label,
+      row.result_text,
+      row.status,
+      row.status_text,
+      row.state,
+      row.event
+    ]
+    : [row];
+  const text = values.map(value => safeStatus(value)).join(' ').toUpperCase();
+  if (/\bTP2\b/.test(text) || text.includes('TAKE_PROFIT_2') || text.includes('TAKE PROFIT 2') || /\bWIN\b/.test(text)) return 'TP2';
+  if (/\bTP1\b/.test(text) || text.includes('TAKE_PROFIT_1') || text.includes('TAKE PROFIT 1')) return 'TP1';
+  if (/\bTAKE[_\s-]?PROFIT\b/.test(text)) return 'TP2';
+  if (/\bSL\b/.test(text) || text.includes('STOP LOSS') || text.includes('STOP_LOSS') || /\bLOST\b/.test(text) || /\bLOSS\b/.test(text)) return 'SL';
+  if (text.includes('EARLY_EXIT') || text.includes('EXIT_EARLY') || text.includes('EARLY EXIT') || text.includes('THOÁT SỚM') || text.includes('THOAT SOM') || text.includes('THOAT_SOM')) return 'Thoát sớm';
+  if (text.includes('BREAK_EVEN') || text.includes('BREAK EVEN') || text.includes('BREAKEVEN') || text.includes('HÒA VỐN') || text.includes('HOA VON') || /\bBE\b/.test(text)) return 'Hòa vốn';
+  if (text.includes('MANUAL_CLOSE') || text.includes('CLOSED_MANUAL') || text.includes('MANUAL CLOSE') || text.includes('CLOSE MANUAL') || text.includes('ĐÓNG TAY') || text.includes('DONG TAY')) return 'Đóng tay';
   return '';
 }
 
@@ -718,6 +733,68 @@ function isClosedTrade(row = {}) {
     || status.includes('closed')
     || Boolean(normalizeResult(row))
     || readTradeR(row) !== null;
+}
+
+function tradeLifecycleText(row = {}) {
+  return [
+    row.status,
+    row.public_status,
+    row.status_text,
+    row.state,
+    row.lifecycle,
+    row.phase
+  ].map(value => safeStatus(value)).join(' ').toUpperCase();
+}
+
+function isRunningStatus(row = {}) {
+  const text = tradeLifecycleText(row);
+  return row.active === true
+    || row.is_active === true
+    || text.includes('ĐANG CHẠY')
+    || text.includes('DANG CHAY')
+    || /\b(RUNNING|ACTIVE|OPEN|OPENED)\b/.test(text);
+}
+
+function isPendingStatus(row = {}) {
+  const text = tradeLifecycleText(row);
+  return text.includes('CHỜ')
+    || text.includes('CHO')
+    || /\b(PENDING|WAITING|CONFIRM|CONFIRMATION)\b/.test(text);
+}
+
+function getTradeOutcomeStatus(trade = {}) {
+  if (isRunningStatus(trade)) return 'Đang chạy';
+  if (isPendingStatus(trade)) return 'Chờ xác nhận';
+
+  const outcome = normalizeResult(trade);
+  if (outcome) return outcome;
+  if (isClosedTrade(trade)) return 'Đã đóng';
+  return '--';
+}
+
+function getTradeResultR(trade = {}) {
+  const outcomeStatus = getTradeOutcomeStatus(trade);
+  if (outcomeStatus === 'Đang chạy' || outcomeStatus === 'Chờ xác nhận' || outcomeStatus === '--') return null;
+
+  const directValue = firstValue(trade.r, trade.r_multiple, trade.result_r, trade.pnl_r, trade.rr);
+  const directNumber = Number(directValue);
+  if (Number.isFinite(directNumber)) return directNumber;
+
+  const text = [
+    trade.result_text,
+    trade.public_result,
+    trade.result,
+    trade.rr_text,
+    trade.status,
+    trade.message
+  ].map(value => safeStatus(value)).join(' ');
+  const match = text.match(/([+-]?\d+(?:\.\d+)?)\s*R\b/i);
+  return match ? Number(match[1]) : null;
+}
+
+function renderTradeResultR(trade = {}) {
+  const rValue = getTradeResultR(trade);
+  return rValue === null ? '--' : renderRValue(rValue);
 }
 
 function resultRowsForStats(tradeJournal, recentResults) {
@@ -1071,7 +1148,6 @@ function renderHeader() {
   document.querySelector('h1').textContent = DISPLAY_BRAND_NAME;
   ensureHeaderRangeFilter();
   updateRangeFilterButtons();
-  renderActiveSignalBanner();
   updateHeaderScrollState();
 }
 
@@ -1079,55 +1155,6 @@ function updateHeaderScrollState() {
   const header = document.querySelector('.app-header');
   if (!header) return;
   header.classList.toggle('is-scrolled', window.scrollY > 8);
-}
-
-function ensureActiveSignalBanner() {
-  const header = document.querySelector('.app-header');
-  if (!header || document.getElementById('activeSignalBanner')) return;
-  header.insertAdjacentHTML('afterend', '<section id="activeSignalBanner" class="active-signal-banner" hidden></section>');
-}
-
-function activeSignalForBanner() {
-  return arr(dashboardData?.active_trades).find(trade => !isClosedTrade(trade)) || null;
-}
-
-function activeBannerMetric(label, value, cls = '') {
-  return `<div class="active-banner-metric"><span>${label}</span><strong class="${cls}">${safe(value)}</strong></div>`;
-}
-
-function renderActiveSignalBanner() {
-  ensureActiveSignalBanner();
-  const banner = document.getElementById('activeSignalBanner');
-  if (!banner) return;
-
-  const trade = activeSignalForBanner();
-  if (!trade) {
-    banner.hidden = true;
-    banner.innerHTML = '';
-    return;
-  }
-
-  const symbol = safe(trade.symbol);
-  const direction = safe(trade.direction);
-  const directionClass = direction === 'LONG' ? 'long' : direction === 'SHORT' ? 'short' : 'info';
-  banner.hidden = false;
-  banner.innerHTML = `
-    <div class="active-banner-head">
-      <span class="state-dot green"></span>
-      <span>Tín hiệu đang chạy</span>
-      <strong>${renderSymbol(symbol)}</strong>
-      <span class="badge ${directionClass}">${direction}</span>
-    </div>
-    <div class="active-banner-grid">
-      ${activeBannerMetric('Khung', trade.timeframe)}
-      ${activeBannerMetric('Entry', formatMaybePrice(trade.entry))}
-      ${activeBannerMetric('SL', formatMaybePrice(trade.sl), 'num-red')}
-      ${activeBannerMetric('TP1', formatMaybePrice(trade.tp1), 'num-cyan')}
-      ${activeBannerMetric('TP2', formatMaybePrice(trade.tp2), 'num-green')}
-      ${activeBannerMetric('R:R', renderTextWithRUnits(formatRiskReward(trade)), 'num-cyan')}
-      ${activeBannerMetric('Độ tự tin', safe(trade.confidence), 'num-green')}
-      ${activeBannerMetric('Trạng thái', safe(trade.status, 'Đang chạy'), 'num-green')}
-    </div>`;
 }
 
 function ensureSystemTab() {
@@ -1232,7 +1259,7 @@ function renderHome() {
   const l = dashboardData.latest_signal || {};
   const latestSymbol = safe(l.symbol, 'ETHUSDT');
   const latestDirection = safe(l.direction, 'LONG');
-  const latestStatus = safe(l.status, 'Chưa có tín hiệu');
+  const latestStatus = getTradeOutcomeStatus(l);
   const latestChanged = metricChanged('latest_signal.symbol', 'latest_signal.status');
   const latestCard = document.getElementById('latestSignal');
   latestCard.classList.toggle('value-updated', latestChanged);
@@ -1244,7 +1271,7 @@ function renderHome() {
       <div class="target-mark">◎</div>
     </div>
     <div class="latest-extra">
-      ${field('Trạng thái', `<span class="badge info ${metricChanged('latest_signal.status') ? 'value-updated' : ''}">${latestStatus}</span>`)}
+      ${field('Trạng thái', `<span class="badge ${statusClass(latestStatus)} ${metricChanged('latest_signal.status') ? 'value-updated' : ''}">${latestStatus}</span>`)}
       ${field('R:R', renderTextWithRUnits(formatRiskReward(l)), 'num-cyan')}
       ${field('Độ tự tin', l.confidence, 'num-green')}
       ${field('Thời gian', formatItemDateTimeVN(l))}
@@ -1411,16 +1438,15 @@ function renderRecentResults() {
   const recentResults = recentResultsForHome();
   document.getElementById('recentResults').innerHTML = recentResults.length
     ? `<div class="recent-results-table">
-        <div class="recent-results-head"><span>Thời gian</span><span>Cặp</span><span>Hướng</span><span>Kết quả</span><span>R</span></div>
+        <div class="recent-results-head"><span>Thời gian</span><span>Cặp</span><span>Hướng</span><span>Trạng thái</span><span>R</span></div>
         ${recentResults.map(r => {
-      const result = formatResultDisplay(r, { includePrice: true });
-      const outcome = normalizeResult(r) || compactResultLabel(r.result);
-      const rValue = readTradeR(r);
+      const status = getTradeOutcomeStatus(r);
+      const rValue = getTradeResultR(r);
       return `<div class="recent-result-row">
         <span class="timeline-time">${formatSystemLogTime(r)}</span>
         <strong>${renderSymbolWithIcon(r.symbol, 'width:28px;height:28px;font-size:14px;margin-right:8px')}</strong>
         <span><span class="badge ${clsDir(r.direction)}">${safe(r.direction)}</span></span>
-        <strong class="${outcome === 'SL' ? 'num-red' : outcome === 'Thoát sớm' ? 'num-cyan' : 'num-green'}">${renderTextWithRUnits(result)}</strong>
+        <strong><span class="badge ${statusClass(status)}">${status}</span></strong>
         <strong class="${safeNumber(rValue) < 0 ? 'num-red' : 'num-green'}">${rValue === null ? '--' : renderRValue(rValue)}</strong>
       </div>`;
     }).join('')}
@@ -1489,9 +1515,8 @@ function field(label, value, cls = '') {
 }
 
 function tradeRow(t, changed = false) {
-  const status = safe(t.status);
-  const statusClass = safeStatus(status).includes('Chờ') ? 'wait' : 'green';
-  return `<tr class="${changed ? 'row-enter' : ''}"><td><strong>${renderSymbolWithIcon(t.symbol)}</strong></td><td class="${clsDir(t.direction)}"><strong>${safe(t.direction)}</strong></td><td>${formatMaybePrice(t.entry)}</td><td>${formatMaybePrice(t.tp1)}</td><td>${formatMaybePrice(t.tp2)}</td><td class="num-red">${formatMaybePrice(t.sl)}</td><td><span class="badge ${statusClass}">${status}</span></td></tr>`;
+  const status = getTradeOutcomeStatus(t);
+  return `<tr class="${changed ? 'row-enter' : ''}"><td><strong>${renderSymbolWithIcon(t.symbol)}</strong></td><td class="${clsDir(t.direction)}"><strong>${safe(t.direction)}</strong></td><td>${formatMaybePrice(t.entry)}</td><td>${formatMaybePrice(t.tp1)}</td><td>${formatMaybePrice(t.tp2)}</td><td class="num-red">${formatMaybePrice(t.sl)}</td><td><span class="badge ${statusClass(status)}">${status}</span></td></tr>`;
 }
 
 function renderSystemMini(id) {
@@ -1530,61 +1555,55 @@ function getFilteredSignals() {
   const tf = document.getElementById('tfFilter')?.value || 'all';
   const dir = document.getElementById('dirFilter')?.value || 'all';
   return signalList().filter(sig => {
-    const status = safeStatus(sig.status);
-    const closed = ['TP1 HIT', 'TP2 HIT', 'SL', 'Thoát sớm'].some(x => status.includes(x));
+    const status = getTradeOutcomeStatus(sig);
+    const closed = isClosedTrade(sig) && status !== 'Đang chạy' && status !== 'Chờ xác nhận';
     const statusOK = activeSignalFilter === 'all' || (activeSignalFilter === 'closed' ? closed : status === activeSignalFilter);
     return statusOK && (pair === 'all' || sig.symbol === pair) && (tf === 'all' || sig.timeframe === tf) && (dir === 'all' || sig.direction === dir);
   });
 }
 
 function renderSignalTable() {
-  document.querySelector('.signal-table thead').innerHTML = '<tr><th>Cặp</th><th>Hướng</th><th>Khung</th><th>Entry</th><th>SL</th><th>TP1</th><th>TP2</th><th>Trạng thái</th><th>Thời gian</th></tr>';
+  document.querySelector('.signal-table thead').innerHTML = '<tr><th>Cặp / Thời gian</th><th>Hướng</th><th>Khung</th><th>Entry</th><th>SL</th><th>TP1</th><th>TP2</th><th>Trạng thái</th><th>Kết quả</th></tr>';
   const hasPublicSignals = arr(dashboardData.signals).length > 0;
   const rows = hasPublicSignals ? getFilteredSignals() : [];
   if (selectedSignalIndex >= rows.length) selectedSignalIndex = 0;
   if (!rows.length) {
     document.getElementById('signalsBody').innerHTML = '<tr><td colspan="9" class="empty-state">Chưa có tín hiệu</td></tr>';
     document.getElementById('signalCountText').textContent = 'Hiển thị 0 tín hiệu';
-    renderSignalDetail(signalList()[0] || {});
     return;
   }
 
   document.getElementById('signalsBody').innerHTML = rows.map((sig, idx) => {
-    const status = safe(sig.status, 'Chưa có tín hiệu');
-    return `<tr class="${idx === selectedSignalIndex ? 'selected' : ''}" data-signal-index="${idx}">
-      <td><strong>${renderSymbolWithIcon(safe(sig.symbol, 'ETHUSDT'))}</strong></td>
+    const status = getTradeOutcomeStatus(sig);
+    return `<tr data-signal-index="${idx}">
+      <td>${renderSignalSymbolTime(sig)}</td>
       <td class="${clsDir(sig.direction)}"><strong>${safe(sig.direction, 'LONG')}</strong></td>
       <td>${safe(sig.timeframe)}</td><td>${formatMaybePrice(sig.entry)}</td><td class="num-red">${formatMaybePrice(sig.sl)}</td><td class="num-green">${formatMaybePrice(sig.tp1)}</td><td class="num-green">${formatMaybePrice(sig.tp2)}</td>
       <td><span class="badge ${statusClass(status)}">${status}</span></td>
-      <td class="timeline-time">${formatItemDateTimeVN(sig)}</td>
+      <td><strong class="signal-result-r">${renderTradeResultR(sig)}</strong></td>
     </tr>`;
   }).join('');
   document.getElementById('signalCountText').textContent = `Hiển thị 1 - ${rows.length} của ${signalList().length} tín hiệu`;
-  renderSignalDetail(rows[selectedSignalIndex] || signalList()[0] || {});
-  document.querySelectorAll('#signalsBody tr').forEach(tr => tr.addEventListener('click', () => { selectedSignalIndex = Number(tr.dataset.signalIndex); renderSignalTable(); }));
+}
+
+function renderSignalSymbolTime(sig = {}) {
+  const timeText = formatItemDateTimeVN(sig);
+  return `<div class="signal-symbol-time">
+    <strong>${renderSymbolWithIcon(safe(sig.symbol, 'ETHUSDT'))}</strong>
+    ${timeText === '--' ? '' : `<span class="signal-row-time">${escapeHtml(timeText)}</span>`}
+  </div>`;
 }
 
 function statusClass(status) {
-  const text = safeStatus(status);
+  const text = safeStatus(status).toUpperCase();
   if (text.includes('SL')) return 'short';
-  if (text.includes('Chờ') || text.includes('Thoát')) return 'wait';
-  if (text.includes('TP') || text.includes('Đang')) return 'green';
+  if (text.includes('TP2') || text.includes('ĐANG CHẠY') || text.includes('DANG CHAY')) return 'green';
+  if (text.includes('TP1')) return 'info';
+  if (text.includes('CHỜ') || text.includes('CHO') || text.includes('PENDING') || text.includes('THOÁT') || text.includes('THOAT')) return 'wait';
+  if (text.includes('HÒA VỐN') || text.includes('HOA VON')) return 'neutral';
+  if (text.includes('ĐÓNG TAY') || text.includes('DONG TAY') || text.includes('ĐÃ ĐÓNG') || text.includes('DA DONG')) return 'info';
   return 'info';
 }
-
-function renderSignalDetail(sig = {}) {
-  const symbol = safe(sig.symbol, 'ETHUSDT');
-  const direction = safe(sig.direction, 'LONG');
-  const status = safe(sig.status, 'Chưa có tín hiệu');
-  const timeText = formatItemDateTimeVN(sig);
-
-  document.getElementById('signalDetail').innerHTML = `<div class="panel-title">◎ Chi tiết tín hiệu</div>
-    <div class="signal-symbol" style="margin-bottom:16px"><span class="coin-icon">${iconFor(symbol)}</span><span class="big-symbol">${renderSymbol(symbol)}</span><span class="badge ${clsDir(direction)}">${direction}</span></div>
-    ${detailRow('R:R', renderTextWithRUnits(formatRiskReward(sig)), 'num-cyan')}${detailRow('Khung thời gian', safe(sig.timeframe))}${detailRow('Entry', formatMaybePrice(sig.entry))}${detailRow('Stop Loss (SL)', formatMaybePrice(sig.sl), 'num-red')}${detailRow('Take Profit 1 (TP1)', formatMaybePrice(sig.tp1), 'num-green')}${detailRow('Take Profit 2 (TP2)', formatMaybePrice(sig.tp2), 'num-green')}${detailRow('Độ tự tin', safe(sig.confidence), 'num-green')}${detailRow('Trạng thái', `<span class="badge ${statusClass(status)}">${status}</span>`)}${detailRow('Thời gian', timeText)}
-    <div class="note-box"><strong class="num-green">ⓘ Ghi chú</strong><br>${sanitizePublicText(sig.note) === '--' ? 'Không có ghi chú' : sanitizePublicText(sig.note)}</div>`;
-}
-
-function detailRow(label, value, cls = '') { return `<div class="detail-row"><span>${label}</span><strong class="${cls}">${safe(value)}</strong></div>`; }
 
 function renderPerformance() {
   ensurePerformanceLayout();
@@ -2334,12 +2353,11 @@ function performanceSeriesForChart() {
 }
 
 function matchesTradeJournalFilter(row) {
-  const status = safeStatus(row.status).toLowerCase();
   const result = normalizeResult(row);
   const direction = safeStatus(row.direction).toUpperCase();
 
-  if (activeTradeJournalFilter === 'running') return status.includes('đang chạy') || status.includes('active') || status.includes('running');
-  if (activeTradeJournalFilter === 'closed') return status.includes('đã đóng') || status.includes('closed');
+  if (activeTradeJournalFilter === 'running') return isJournalRunning(row);
+  if (activeTradeJournalFilter === 'closed') return isJournalClosed(row);
   if (activeTradeJournalFilter === 'long') return direction === 'LONG';
   if (activeTradeJournalFilter === 'short') return direction === 'SHORT';
   if (activeTradeJournalFilter === 'sl') return result === 'SL';
@@ -2370,10 +2388,12 @@ function compactResultLabel(result) {
   const text = safeStatus(result).trim();
   const upper = text.toUpperCase();
   if (!text || text === '--') return '--';
-  if (upper.includes('TP1')) return 'TP1';
   if (upper.includes('TP2')) return 'TP2';
+  if (upper.includes('TP1')) return 'TP1';
   if (/\bTP\b/.test(upper)) return 'TP';
   if (/\bSL\b/.test(upper) || upper.includes('STOP LOSS')) return 'SL';
+  if (upper.includes('BREAK_EVEN') || upper.includes('BREAK EVEN') || upper.includes('HÒA VỐN') || upper.includes('HOA VON') || /\bBE\b/.test(upper)) return 'Hòa vốn';
+  if (upper.includes('MANUAL_CLOSE') || upper.includes('CLOSED_MANUAL') || upper.includes('ĐÓNG TAY') || upper.includes('DONG TAY')) return 'Đóng tay';
   return text;
 }
 
@@ -2386,20 +2406,16 @@ function formatJournalR(value) {
 }
 
 function formatJournalResult(row = {}) {
-  const status = safeStatus(row.status).toLowerCase();
-  if (status.includes('đang chạy') || status.includes('running') || status.includes('active') || status.includes('chờ')) return '--';
-
-  return formatResultDisplay(row, { includePrice: true, includeR: true });
+  return renderTradeResultR(row);
 }
 
 function isJournalRunning(row) {
-  const status = safeStatus(row.status).toLowerCase();
-  return status.includes('đang chạy') || status.includes('active') || status.includes('running');
+  return getTradeOutcomeStatus(row) === 'Đang chạy';
 }
 
 function isJournalClosed(row) {
-  const status = safeStatus(row.status).toLowerCase();
-  return status.includes('đã đóng') || status.includes('closed');
+  const status = getTradeOutcomeStatus(row);
+  return isClosedTrade(row) && status !== 'Đang chạy' && status !== 'Chờ xác nhận';
 }
 
 function journalResultText(row) {
@@ -2519,6 +2535,7 @@ function renderTradeJournal() {
       const direction = safe(row.direction);
       const directionClass = direction === 'LONG' ? 'long' : direction === 'SHORT' ? 'short' : 'info';
       const result = formatJournalResult(row);
+      const status = getTradeOutcomeStatus(row);
       const dayKey = formatDateKeyVN(getDailyProfitTimestamp(row), row);
       const highlightClass = dayKey && selectedDailyProfitDayKey === dayKey ? ' class="journal-day-highlight"' : '';
       const dayAttr = dayKey ? ` data-trade-day="${escapeHtml(dayKey)}"` : '';
@@ -2532,8 +2549,8 @@ function renderTradeJournal() {
         <td class="num-cyan">${formatTradeNumber(row.tp1)}</td>
         <td class="num-green">${formatTradeNumber(row.tp2)}</td>
         <td>${formatPositionValue(row.position_value)}</td>
-        <td><span class="badge ${statusClass(row.status)}">${safe(row.status)}</span></td>
-        <td><strong class="${journalResultClass(result)}">${renderTextWithRUnits(result)}</strong></td>
+        <td><span class="badge ${statusClass(status)}">${status}</span></td>
+        <td><strong class="${journalResultClass(result)}">${result}</strong></td>
       </tr>`;
     }).join('')
     : '<tr><td colspan="11" class="empty-state">Chưa có nhật ký giao dịch.</td></tr>';
