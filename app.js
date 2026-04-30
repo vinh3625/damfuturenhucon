@@ -929,16 +929,84 @@ function normalizeResult(row = {}) {
 }
 
 function readTradeR(row = {}) {
-  const value = typeof row === 'object'
-    ? firstValue(row.r, row.rr, row.r_multiple, row.result_r, row.pnl_r)
-    : row;
-  const number = Number(value);
-  if (Number.isFinite(number)) return number;
-  const text = typeof row === 'object'
-    ? safeStatus(firstValue(row.result_text, row.result, row.message))
-    : safeStatus(row);
+  if (typeof row !== 'object') {
+    const number = Number(row);
+    if (Number.isFinite(number)) return number;
+    const text = safeStatus(row);
+    const match = text.match(/([+-]?\d+(?:\.\d+)?)\s*R\b/i);
+    return match ? Number(match[1]) : null;
+  }
+  return inferTradeR(row);
+}
+
+function inferTradeRFromPrices(trade) {
+  const entry = Number(trade.entry);
+  const sl = Number(trade.sl);
+  const close = Number(firstValue(
+    trade.exit_price,
+    trade.close_price,
+    trade.hit_price,
+    trade.closed_price,
+    trade.executed_price,
+    trade.price
+  ));
+  const direction = safeStatus(trade.direction).toUpperCase();
+  const risk = Math.abs(entry - sl);
+  if (!Number.isFinite(entry) || !Number.isFinite(sl) || !Number.isFinite(close) || risk <= 0) return null;
+  if (direction === 'LONG') return (close - entry) / risk;
+  if (direction === 'SHORT') return (entry - close) / risk;
+  return null;
+}
+
+function targetRFromTrade(trade, targetKey) {
+  const entry = Number(trade.entry);
+  const sl = Number(trade.sl);
+  const target = Number(trade[targetKey]);
+  const risk = Math.abs(entry - sl);
+  if (!Number.isFinite(entry) || !Number.isFinite(sl) || !Number.isFinite(target) || risk <= 0) return null;
+  return Math.abs(target - entry) / risk;
+}
+
+function inferTradeR(trade) {
+  const outcome = normalizeResult(trade);
+  const direct = firstValue(trade.r, trade.rr, trade.r_multiple, trade.result_r, trade.pnl_r);
+  const directNumber = Number(direct);
+  const isZeroDirect = Number.isFinite(directNumber) && Math.abs(directNumber) < 1e-9;
+
+  // Non-zero direct R → trust it
+  if (Number.isFinite(directNumber) && !isZeroDirect) return directNumber;
+
+  // Direct R is 0 → only trust for break-even / no outcome
+  if (Number.isFinite(directNumber) && isZeroDirect) {
+    const text = [
+      trade.result, trade.status, trade.result_text,
+      trade.close_reason, trade.exit_reason, trade.actual_result
+    ].map(safeStatus).join(' ').toUpperCase();
+    if (outcome === 'Hòa vốn' || text.includes('BREAK_EVEN') || text.includes('BREAKEVEN') || text.includes('HÒA VỐN') || text.includes('HOA VON')) {
+      return 0;
+    }
+    if (!outcome) return 0;
+    // SL/TP1/TP2 with 0R is suspicious — fall through to inference
+  }
+
+  // Try computing from close price
+  const priceR = inferTradeRFromPrices(trade);
+  if (Number.isFinite(priceR)) return Math.round(priceR * 100) / 100;
+
+  // Outcome-based fallbacks
+  if (outcome === 'SL') return -1;
+  if (outcome === 'TP1') return targetRFromTrade(trade, 'tp1') ?? 1;
+  if (outcome === 'TP2') return targetRFromTrade(trade, 'tp2') ?? targetRFromTrade(trade, 'tp1') ?? 2;
+  if (outcome === 'Hòa vốn') return 0;
+
+  // Try parsing R from text fields
+  const text = [
+    trade.result_text, trade.rr_text, trade.result, trade.message
+  ].map(safeStatus).join(' ');
   const match = text.match(/([+-]?\d+(?:\.\d+)?)\s*R\b/i);
-  return match ? Number(match[1]) : null;
+  if (match) return Number(match[1]);
+
+  return Number.isFinite(directNumber) ? directNumber : null;
 }
 
 function isClosedTrade(row = {}) {
@@ -989,21 +1057,7 @@ function getTradeOutcomeStatus(trade = {}) {
 function getTradeResultR(trade = {}) {
   const outcomeStatus = getTradeOutcomeStatus(trade);
   if (outcomeStatus === 'Đang chạy' || outcomeStatus === 'Chờ xác nhận' || outcomeStatus === '--') return null;
-
-  const directValue = firstValue(trade.r, trade.r_multiple, trade.result_r, trade.pnl_r, trade.rr);
-  const directNumber = Number(directValue);
-  if (Number.isFinite(directNumber)) return directNumber;
-
-  const text = [
-    trade.result_text,
-    trade.public_result,
-    trade.result,
-    trade.rr_text,
-    trade.status,
-    trade.message
-  ].map(value => safeStatus(value)).join(' ');
-  const match = text.match(/([+-]?\d+(?:\.\d+)?)\s*R\b/i);
-  return match ? Number(match[1]) : null;
+  return inferTradeR(trade);
 }
 
 function renderTradeResultR(trade = {}) {
