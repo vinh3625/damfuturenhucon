@@ -257,7 +257,7 @@ h1 { margin: 0; font-size: 31px; letter-spacing: .8px; }
 .panel { padding: 16px; }
 .table-wrap { width: 100%; overflow-x: auto; }
 table { width: 100%; border-collapse: collapse; font-size: 14px; }
-th { color: #aebabe; font-weight: 700; text-align: left; padding: 10px 12px; background: rgba(255,255,255,.025); text-transform: uppercase; }
+th { color: rgba(232, 239, 240, 0.82); font-weight: 850; text-align: left; padding: 10px 12px; background: rgba(255,255,255,.025); text-transform: uppercase; letter-spacing: .035em; }
 td { padding: 12px; border-top: 1px solid rgba(180,230,255,.08); color: #e5eeec; }
 tr.selected { outline: 1px solid rgba(103,240,92,.74); outline-offset: -1px; background: rgba(67,240,92,.06); }
 .num-green { color: var(--trade-long); font-weight: 850; }
@@ -284,9 +284,11 @@ tr.selected { outline: 1px solid rgba(103,240,92,.74); outline-offset: -1px; bac
 }
 .recent-results-head {
   padding: 0 12px 9px;
-  color: #aebabe;
+  color: rgba(232, 239, 240, 0.82);
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 850;
+  letter-spacing: .035em;
+  text-transform: uppercase;
   border-bottom: 1px solid rgba(255,255,255,.10);
 }
 .recent-result-row {
