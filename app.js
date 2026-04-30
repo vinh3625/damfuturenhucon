@@ -84,39 +84,112 @@ function renderSymbolWithIcon(symbol, iconStyle = 'width:30px;height:30px;font-s
   return `<span class="coin-icon" style="${iconStyle}">${iconFor(symbol)}</span>${renderSymbol(symbol)}`;
 }
 
-function getPairTimeText(item = {}) {
-  const fields = [
-    'closed_at',
-    'closed_at_iso',
-    'time',
-    'time_iso',
-    'opened_at',
-    'opened_at_iso',
-    'created_at_iso',
-    'created_at',
-    'timestamp',
-    'updated_at',
-    'display_time',
-    'date'
-  ];
+const DEFAULT_PAIR_TIME_FIELDS = [
+  'closed_at',
+  'closed_at_iso',
+  'time',
+  'time_iso',
+  'opened_at',
+  'opened_at_iso',
+  'created_at_iso',
+  'created_at',
+  'timestamp',
+  'updated_at',
+  'display_time',
+  'date'
+];
 
+const OPEN_TRADE_TIME_FIELDS = [
+  'opened_at',
+  'opened_at_iso',
+  'time',
+  'time_iso',
+  'created_at_iso',
+  'created_at',
+  'entry_time',
+  'entry_at',
+  'timestamp',
+  'updated_at',
+  'display_time',
+  'date'
+];
+
+function timestampFromFields(item = {}, fields = DEFAULT_PAIR_TIME_FIELDS) {
   for (const field of fields) {
     const time = parseDashboardTime(item[field], item);
-    if (time !== null) return formatDateTimeVN(time);
+    if (time !== null) return time;
   }
 
-  return '';
+  return null;
+}
+
+function getPairTimeText(item = {}, options = {}) {
+  const time = typeof options.timeReader === 'function'
+    ? options.timeReader(item)
+    : timestampFromFields(item, options.timeFields || DEFAULT_PAIR_TIME_FIELDS);
+  return time === null || time === undefined ? '' : formatDateTimeVN(time);
 }
 
 function renderPairTimeCell(item = {}, options = {}) {
   const symbol = safe(firstValue(item.symbol, item.coin), options.fallbackSymbol || 'ETHUSDT');
-  const timeText = getPairTimeText(item);
+  const timeText = getPairTimeText(item, options);
   const iconStyle = options.iconStyle || 'width:30px;height:30px;font-size:14px;margin-right:8px';
   const extraClass = options.className ? ` ${escapeHtml(options.className)}` : '';
   return `<div class="pair-time-cell${extraClass}">
     <strong>${renderSymbolWithIcon(symbol, iconStyle)}</strong>
     ${timeText ? `<span class="pair-time">${escapeHtml(timeText)}</span>` : ''}
   </div>`;
+}
+
+function tradeNumbersMatch(a, b) {
+  const left = cleanPrice(a);
+  const right = cleanPrice(b);
+  if (left === null || right === null) return false;
+  return Math.abs(left - right) <= Math.max(0.00000001, Math.abs(left) * 0.00000001);
+}
+
+function matchingSignalForActiveTrade(trade = {}) {
+  const symbol = safeStatus(trade.symbol).toUpperCase();
+  const direction = safeStatus(trade.direction).toUpperCase();
+  if (!symbol) return null;
+
+  return signalList().find(signal => {
+    if (safeStatus(signal.symbol).toUpperCase() !== symbol) return false;
+    if (direction && safeStatus(signal.direction).toUpperCase() !== direction) return false;
+    if (!isMissingPrice(trade.entry) && !tradeNumbersMatch(trade.entry, signal.entry)) return false;
+    return getTradeOutcomeStatus(signal) === 'Đang chạy';
+  }) || null;
+}
+
+function getTradeOpenTime(trade = {}) {
+  const directTime = timestampFromFields(trade, OPEN_TRADE_TIME_FIELDS);
+  if (directTime !== null) return directTime;
+
+  const matchingSignal = matchingSignalForActiveTrade(trade);
+  return matchingSignal ? timestampFromFields(matchingSignal, OPEN_TRADE_TIME_FIELDS) : null;
+}
+
+function formatRunningDuration(openTime, now = new Date()) {
+  const start = parseDashboardTime(openTime);
+  const end = now instanceof Date ? now.getTime() : parseDashboardTime(now);
+  if (start === null || end === null) return '--';
+
+  const diffMs = end - start;
+  if (diffMs < 0) return '--';
+
+  const totalMinutes = Math.floor(diffMs / 60000);
+  if (totalMinutes < 60) return `${totalMinutes}m`;
+
+  const totalHours = Math.floor(totalMinutes / 60);
+  if (totalHours < 24) return `${totalHours}h ${totalMinutes % 60}m`;
+
+  return `${Math.floor(totalHours / 24)}d ${totalHours % 24}h`;
+}
+
+function renderRunningDuration(trade = {}) {
+  const duration = formatRunningDuration(getTradeOpenTime(trade));
+  const missing = duration === '--' ? ' missing' : '';
+  return `<span class="running-duration${missing}">${duration}</span>`;
 }
 
 const signalList = () => {
@@ -1351,7 +1424,7 @@ function ensureHomeLayout() {
 function renderActiveTrades(activeTrades = []) {
   document.getElementById('activeTradesBody').innerHTML = activeTrades.length
     ? activeTrades.map(t => tradeRow(t, metricChanged('active_trades.count'))).join('')
-    : '<tr><td colspan="7" class="empty-state">Hiện tại không có lệnh nào đang mở</td></tr>';
+    : '<tr><td colspan="8" class="empty-state">Hiện tại không có lệnh nào đang mở</td></tr>';
 }
 
 function homeMetric(label, value, cls = '') {
@@ -1550,7 +1623,7 @@ function field(label, value, cls = '') {
 
 function tradeRow(t, changed = false) {
   const status = getTradeOutcomeStatus(t);
-  return `<tr class="${changed ? 'row-enter' : ''}"><td><strong>${renderSymbolWithIcon(t.symbol)}</strong></td><td class="${clsDir(t.direction)}"><strong>${safe(t.direction)}</strong></td><td>${formatMaybePrice(t.entry)}</td><td>${formatMaybePrice(t.tp1)}</td><td>${formatMaybePrice(t.tp2)}</td><td class="num-red">${formatMaybePrice(t.sl)}</td><td><span class="badge ${statusClass(status)}">${status}</span></td></tr>`;
+  return `<tr class="${changed ? 'row-enter' : ''}"><td>${renderPairTimeCell(t, { timeReader: getTradeOpenTime })}</td><td>${renderRunningDuration(t)}</td><td class="${clsDir(t.direction)}"><strong>${safe(t.direction)}</strong></td><td>${formatMaybePrice(t.entry)}</td><td>${formatMaybePrice(t.tp1)}</td><td>${formatMaybePrice(t.tp2)}</td><td class="num-red">${formatMaybePrice(t.sl)}</td><td><span class="badge ${statusClass(status)}">${status}</span></td></tr>`;
 }
 
 function renderSystemMini(id) {
@@ -3017,5 +3090,7 @@ loadData()
     console.error('[dashboard] Initial load failed', error);
   });
 setInterval(() => {
-  if (dashboardData) renderHeader();
+  if (!dashboardData) return;
+  renderHeader();
+  renderActiveTrades(arr(dashboardData.active_trades));
 }, 30000);

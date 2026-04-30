@@ -318,6 +318,17 @@ label { color: #b5c1c4; display: flex; align-items: center; gap: 8px; }
   display: inline-flex;
   white-space: nowrap;
 }
+.running-duration {
+  color: rgba(232, 246, 242, .86);
+  font-weight: 850;
+  white-space: nowrap;
+}
+.running-duration.missing {
+  color: rgba(180, 190, 200, .55);
+}
+.home-active-panel table {
+  min-width: 900px;
+}
 .detail-panel { border-color: rgba(103,240,92,.52); box-shadow: 0 0 12px rgba(103,240,92,.10); }
 .detail-row { display:grid; grid-template-columns: 1fr auto; gap: 12px; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,.07); }
 .note-box { margin-top: 14px; padding: 13px; border: 1px solid rgba(103,240,92,.20); border-radius: 10px; color: #cddbd8; }
