@@ -2110,3 +2110,103 @@ body.data-refreshing .live-badge {
     white-space: nowrap;
   }
 }
+
+/* ===== R-unit display ===== */
+.r-display {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 2px;
+  white-space: nowrap;
+  line-height: 1;
+}
+
+.r-display .r-value {
+  font-weight: 900;
+}
+
+.r-display .r-unit {
+  font-size: 0.68em;
+  font-weight: 600;
+  opacity: 0.72;
+  letter-spacing: 0.02em;
+  margin-left: 1px;
+}
+
+.r-display.positive {
+  color: var(--green);
+}
+
+.r-display.negative {
+  color: var(--red);
+}
+
+.r-display.neutral {
+  color: rgba(235, 245, 242, 0.82);
+}
+
+.r-display.positive .r-unit,
+.r-display.negative .r-unit,
+.r-display.neutral .r-unit {
+  color: currentColor;
+  opacity: 0.68;
+}
+
+.r-display.on-solid {
+  color: #fff;
+}
+
+.r-display.on-solid .r-unit {
+  color: rgba(255, 255, 255, .72);
+}
+
+/* SVG R-unit tspan styling */
+.svg-r-value {
+  font-weight: 800;
+}
+
+.svg-r-unit {
+  font-size: 0.72em;
+  font-weight: 500;
+  opacity: 0.72;
+}
+
+/* R-display in tight contexts */
+.active-banner-metric .r-display {
+  display: inline;
+}
+
+.active-banner-metric .r-display .r-unit {
+  font-size: 0.72em;
+}
+
+.kpi-value .r-display {
+  font-size: inherit;
+  font-weight: inherit;
+}
+
+.journal-stat-card .r-display {
+  font-size: inherit;
+  font-weight: inherit;
+}
+
+.range-bars-summary .r-display {
+  font-size: inherit;
+}
+
+td .r-display {
+  vertical-align: baseline;
+}
+
+.daily-profit-r .r-display {
+  font-size: 1.18rem;
+}
+
+.daily-profit-r .r-display .r-unit {
+  font-size: .66em;
+}
+
+.home-mini-stat .r-display,
+.home-metric-strip .r-display {
+  font-size: inherit;
+  font-weight: inherit;
+}
