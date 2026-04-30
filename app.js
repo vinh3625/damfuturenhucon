@@ -1072,6 +1072,13 @@ function renderHeader() {
   ensureHeaderRangeFilter();
   updateRangeFilterButtons();
   renderActiveSignalBanner();
+  updateHeaderScrollState();
+}
+
+function updateHeaderScrollState() {
+  const header = document.querySelector('.app-header');
+  if (!header) return;
+  header.classList.toggle('is-scrolled', window.scrollY > 8);
 }
 
 function ensureActiveSignalBanner() {
@@ -2401,7 +2408,7 @@ function journalResultText(row) {
 
 function statCard(label, value, cls = '', tone = 'neutral') {
   const resolvedTone = ['neutral', 'cyan', 'green', 'red'].includes(tone) ? tone : 'neutral';
-  return `<div class="journal-stat-card journal-stat-${resolvedTone}"><span>${label}</span><strong class="${cls}">${safe(value)}</strong></div>`;
+  return `<div class="journal-stat-card journal-stat-${resolvedTone}"><span class="journal-stat-label">${label}</span><strong class="${cls}">${safe(value)}</strong></div>`;
 }
 
 function renderJournalQuickStats(rows) {
@@ -2942,6 +2949,8 @@ function bindEvents() {
       renderLineChart();
     }
   });
+  window.addEventListener('scroll', updateHeaderScrollState, { passive: true });
+  updateHeaderScrollState();
 }
 
 function renderAll() {
